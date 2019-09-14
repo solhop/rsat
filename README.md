@@ -12,7 +12,7 @@ $ cargo install rsat
 ### Run
 
 ```sh
-$ slp input.cnf
+$ slp input.cnf --max-tries=100 --max-flips=1000
 ```
 
 where `input.cnf` contains the input SAT instance to be solved in DIMACS format.

@@ -85,13 +85,10 @@ impl Formula {
         self.clauses.push(Clause(cl));
     }
 
-    pub fn local_search(&self) -> Solution {
+    pub fn local_search(&self, max_tries: u32, max_flips: u32) -> Solution {
         let mut curr_model = vec![-1; self.num_vars as usize];
         let mut best_model = vec![-1; self.num_vars as usize];
         let mut best_n_unsat_clauses = self.clauses.len();
-
-        let max_tries = 10;
-        let max_flips = 100;
 
         let mut clause_unsat = vec![1; self.clauses.len()];
 

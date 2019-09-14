@@ -21,3 +21,4 @@ maintenance = { status = "actively-developed" }
 [dependencies]
 regex = "1"
 rand = "0.7"
+clap = "2.33.0"

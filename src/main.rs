@@ -1,19 +1,47 @@
-use std::env;
+use clap::{App, Arg};
 use std::error::Error;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        println!("No file name provided");
-        return;
-    }
-    let formula = match rsat::Formula::new_from_file(&args[1]) {
-        Ok(f) => f,
-        Err(e) => panic!("Error: {}", e.description()),
+    let matches = App::new("rsat")
+        .version("0.1.0")
+        .about("SolHOP SAT Solver")
+        .arg(
+            Arg::with_name("file")
+                .index(1)
+                .required(true)
+                .help("Input file"),
+        )
+        .arg(
+            Arg::with_name("max-tries")
+                .long("max-tries")
+                .takes_value(true)
+                .help("Maximum number of tries"),
+        )
+        .arg(
+            Arg::with_name("max-flips")
+                .long("max-flips")
+                .takes_value(true)
+                .help("Maxinum number of flips in each try"),
+        )
+        .get_matches();
+    let formula = match matches.value_of("file") {
+        None => panic!("File name is required"),
+        Some(input_file) => match rsat::Formula::new_from_file(input_file) {
+            Ok(f) => f,
+            Err(e) => panic!("Error: {}", e.description()),
+        },
+    };
+    let max_tries = match matches.value_of("max-tries") {
+        None => 100,
+        Some(n) => n.parse().expect("Expected an integer"),
+    };
+    let max_flips = match matches.value_of("max-flips") {
+        None => 1000,
+        Some(n) => n.parse().expect("Expected an integer"),
     };
 
     use rsat::Solution::*;
-    match formula.local_search() {
+    match formula.local_search(max_tries, max_flips) {
         Unsat => println!("UNSAT"),
         Best(solution) => {
             println!("UNKNOWN");
