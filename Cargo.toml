@@ -3,8 +3,20 @@ name = "rsat"
 version = "0.1.0"
 authors = ["Prateek Kumar <prateek@prateekkumar.in>"]
 edition = "2018"
+description = """
+SolHOP SAT Solver
+"""
+documentation = "https://docs.rs/rsat/"
+homepage = "https://docs.rs/crate/rsat/"
+repository = "https://github.com/solhop/rsat"
+readme = "README.md"
+keywords = ["SAT", "Satisfiability", "Solver", "Math"]
+categories = ["science"]
+license = "MIT"
+exclude = ["/.vscode/", "/.github/", "azure-pipelines.yml"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[badges]
+maintenance = { status = "actively-developed" }
 
 [dependencies]
 regex = "1"

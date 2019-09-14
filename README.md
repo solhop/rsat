@@ -1,16 +1,22 @@
-# rsat - SAT Solver in Rust
+# rsat
+Local Search SAT Solver in Rust based on [probSAT](https://github.com/adrianopolus/probSAT).
 
-## How to run?
+## Install and Run
 
-* Build
+### Install
+
 ```sh
-$ cargo build --release
+$ cargo install rsat
 ```
 
-* Run
+### Run
+
 ```sh
-$ ./target/release/rsat examples/file.cnf
+$ slp input.cnf
 ```
 
----
-Copyright (c) 2019 Prateek Kumar
+where `input.cnf` contains the input SAT instance to be solved in DIMACS format.
+
+## License
+
+[MIT](LICENSE)
