@@ -1,3 +1,23 @@
+//! `rsat` is a SAT Solver.
+//!
+//! Currently, it implements Local Search based on probSAT.
+//!
+//! ## An example
+//!
+//! ```rust
+//! fn main() {
+//!     let input = "
+//!     c SAT instance
+//!     p cnf 3 4
+//!     1 0
+//!     -1 -2 0
+//!     2 -3 0
+//!     -3 0
+//!     ";
+//!     println!("{:?}", rsat::Formula::new_from_buf_reader(&mut input.as_bytes()).local_search(10, 100));
+//! }
+//! ```
+
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use regex::Regex;
@@ -5,29 +25,54 @@ use std::fs::File;
 use std::io;
 use std::io::BufRead;
 
-/// Magic numbers
+/// Magic numbers used by local search
 const C_MAKE: f32 = 0.5;
 const C_BREAK: f32 = 3.6;
 
+/// A literal.
+#[derive(Debug)]
 pub struct Lit(i32);
 
+/// A Clause.
+#[derive(Debug)]
 pub struct Clause(Vec<Lit>);
 
+/// A SAT Formula
+#[derive(Debug)]
 pub struct Formula {
     num_vars: u32,
     clauses: Vec<Clause>,
 }
 
+/// Solution to the SAT Formula.
+#[derive(Debug)]
 pub enum Solution {
+    /// The formula is unsatisfiable
     Unsat,
+    /// Neither SAT or UNSAT was proven. Best model known so far.
     Best(Vec<i32>),
+    /// The formula is satisfiable. A satifying model for the formula.
     Sat(Vec<i32>),
 }
 
 impl Formula {
-    pub fn new_from_file(filename: &str) -> io::Result<Formula> {
-        let file = File::open(filename)?;
-        let reader = io::BufReader::new(file);
+    /// Read formula in DIMACS format from STDIN.
+    pub fn new_from_stdin() -> Self {
+        Formula::new_from_buf_reader(&mut std::io::stdin().lock())
+    }
+
+    /// Read formula in DIMACS format from a file.
+    pub fn new_from_file(filename: &str) -> Self {
+        let file = File::open(filename).expect("File not found");
+        let mut reader = io::BufReader::new(file);
+        Formula::new_from_buf_reader(&mut reader)
+    }
+
+    /// Read formula in DIMACS format from buffer reader.
+    pub fn new_from_buf_reader<F>(reader: &mut F) -> Self
+    where
+        F: std::io::BufRead,
+    {
         let mut n_clauses = 0usize;
         let mut f = Formula {
             num_vars: 0,
@@ -35,7 +80,11 @@ impl Formula {
         };
 
         for line in reader.lines() {
-            let line = line?;
+            let line = line.unwrap();
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
             if line.starts_with('c') {
                 continue;
             } else if line.starts_with('p') {
@@ -70,21 +119,30 @@ impl Formula {
             }
         }
 
-        Ok(f)
+        f
     }
 
     fn set_num_vars(&mut self, n_vars: u32) {
         self.num_vars = n_vars;
     }
 
+    /// Returns the number of variables in the formula.
     pub fn n_vars(&self) -> u32 {
         self.num_vars
     }
 
+    /// Returns the number of clauses in the formula.
+    pub fn n_clauses(&self) -> u32 {
+        self.clauses.len() as u32
+    }
+
+    /// Add a clause to the formula.
     pub fn add_clause(&mut self, cl: Vec<Lit>) {
         self.clauses.push(Clause(cl));
     }
 
+    /// Local Search based on probSAT. Tries for `max_tries` times
+    /// with `max_flips` flips in each try.
     pub fn local_search(&self, max_tries: u32, max_flips: u32) -> Solution {
         let mut curr_model = vec![-1; self.num_vars as usize];
         let mut best_model = vec![-1; self.num_vars as usize];

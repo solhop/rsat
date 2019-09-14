@@ -1,5 +1,4 @@
 use clap::{App, Arg};
-use std::error::Error;
 
 fn main() {
     let matches = App::new("rsat")
@@ -26,10 +25,7 @@ fn main() {
         .get_matches();
     let formula = match matches.value_of("file") {
         None => panic!("File name is required"),
-        Some(input_file) => match rsat::Formula::new_from_file(input_file) {
-            Ok(f) => f,
-            Err(e) => panic!("Error: {}", e.description()),
-        },
+        Some(input_file) => rsat::Formula::new_from_file(input_file),
     };
     let max_tries = match matches.value_of("max-tries") {
         None => 100,
