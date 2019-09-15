@@ -30,7 +30,7 @@ const C_MAKE: f32 = 0.5;
 const C_BREAK: f32 = 3.6;
 
 /// A literal.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lit(i32);
 
 /// A Clause.
@@ -42,6 +42,14 @@ pub struct Clause(Vec<Lit>);
 pub struct Formula {
     num_vars: u32,
     clauses: Vec<Clause>,
+}
+
+/// Lifted Boolean
+#[derive(Debug, Clone, PartialEq)]
+pub enum LBool {
+    True,
+    False,
+    None,
 }
 
 /// Solution to the SAT Formula.
@@ -99,7 +107,7 @@ impl Formula {
                         Ok(n) => n,
                         _ => panic!("Input file could not be parsed"),
                     };
-                    f.set_num_vars(n_vars);
+                    f.num_vars = n_vars;
                 }
             } else {
                 let re = Regex::new(r"(-?\d+)").unwrap();
@@ -122,10 +130,6 @@ impl Formula {
         f
     }
 
-    fn set_num_vars(&mut self, n_vars: u32) {
-        self.num_vars = n_vars;
-    }
-
     /// Returns the number of variables in the formula.
     pub fn n_vars(&self) -> u32 {
         self.num_vars
@@ -143,7 +147,8 @@ impl Formula {
 
     /// Local Search based on probSAT. Tries for `max_tries` times
     /// with `max_flips` flips in each try.
-    pub fn local_search(&self, max_tries: u32, max_flips: u32) -> Solution {
+    pub fn local_search(&mut self, max_tries: u32, max_flips: u32) -> Solution {
+        let l_model = self.simplify();
         let mut curr_model = vec![-1; self.num_vars as usize];
         let mut best_model = vec![-1; self.num_vars as usize];
         let mut best_n_unsat_clauses = self.clauses.len();
@@ -153,7 +158,7 @@ impl Formula {
         let mut rng = thread_rng();
 
         for _ in 0..max_tries {
-            Formula::gen_rand_model(&mut curr_model, &mut rng);
+            Formula::gen_rand_model(&mut curr_model, &mut rng, &l_model);
             for _ in 0..max_flips {
                 let mut n_unsat_clauses = 0;
                 for (i, Clause(cl)) in self.clauses.iter().enumerate() {
@@ -218,12 +223,68 @@ impl Formula {
         Solution::Best(best_model)
     }
 
-    fn gen_rand_model<T>(model: &mut Vec<i32>, rng: &mut T)
+    /// Simplify the formula by performing unit propagation
+    /// Returns false if formula is found unsat
+    pub fn simplify(&mut self) -> Vec<LBool> {
+        let mut model = vec![LBool::None; self.num_vars as usize];
+        let mut cl_sat = vec![false; self.clauses.len()];
+        let mut simplified = true;
+        while simplified {
+            simplified = false;
+            for (i, Clause(cl)) in self.clauses.iter().enumerate() {
+                if cl_sat[i] {
+                    continue;
+                }
+                let mut n_unassigned = 0;
+                let mut unassigned_lit = 0;
+                for &Lit(l) in cl {
+                    let var = l.abs();
+                    let var_i = (var - 1) as usize;
+                    if model[var_i] == LBool::None {
+                        n_unassigned += 1;
+                        unassigned_lit = l;
+                    }
+                    if (l > 0 && model[var_i] == LBool::True)
+                        || (l < 0 && model[var_i] == LBool::False)
+                    {
+                        cl_sat[i] = true;
+                        break;
+                    }
+                }
+                if cl_sat[i] {
+                    continue;
+                }
+                if n_unassigned == 1 {
+                    if unassigned_lit > 0 {
+                        model[(unassigned_lit - 1) as usize] = LBool::True;
+                    } else {
+                        model[(-unassigned_lit - 1) as usize] = LBool::False;
+                    }
+                    cl_sat[i] = true;
+                    simplified = true;
+                }
+            }
+        }
+        let mut clauses = vec![];
+        for (i, Clause(cl)) in self.clauses.iter().enumerate() {
+            if !cl_sat[i] {
+                clauses.push(Clause(cl.to_vec()));
+            }
+        }
+        self.clauses = clauses;
+        model
+    }
+
+    fn gen_rand_model<T>(model: &mut Vec<i32>, rng: &mut T, l_model: &[LBool])
     where
         T: rand::Rng,
     {
-        for v in model.iter_mut() {
-            *v = 2 * rng.gen_range(0, 2) - 1;
+        for (i, v) in model.iter_mut().enumerate() {
+            match l_model[i] {
+                LBool::None => *v = 2 * rng.gen_range(0, 2) - 1,
+                LBool::True => *v = 1,
+                LBool::False => *v = -1,
+            }
         }
     }
 

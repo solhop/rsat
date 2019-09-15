@@ -23,7 +23,7 @@ fn main() {
                 .help("Maxinum number of flips in each try"),
         )
         .get_matches();
-    let formula = match matches.value_of("file") {
+    let mut formula = match matches.value_of("file") {
         None => panic!("File name is required"),
         Some(input_file) => rsat::Formula::new_from_file(input_file),
     };
