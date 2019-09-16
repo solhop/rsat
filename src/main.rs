@@ -41,14 +41,16 @@ fn main() {
         Unsat => println!("UNSAT"),
         Best(solution) => {
             println!("UNKNOWN");
-            for (i, v) in solution.iter().enumerate() {
+            let solution = solution.iter().map(|&x| if x { 1 } else { -1 });
+            for (i, v) in solution.enumerate() {
                 print!("{} ", v * ((i + 1) as i32));
             }
             println!("0");
         }
         Sat(solution) => {
             println!("SAT");
-            for (i, v) in solution.iter().enumerate() {
+            let solution = solution.iter().map(|&x| if x { 1 } else { -1 });
+            for (i, v) in solution.enumerate() {
                 print!("{} ", v * ((i + 1) as i32));
             }
             println!("0");

@@ -58,9 +58,9 @@ pub enum Solution {
     /// The formula is unsatisfiable
     Unsat,
     /// Neither SAT or UNSAT was proven. Best model known so far.
-    Best(Vec<i32>),
+    Best(Vec<bool>),
     /// The formula is satisfiable. A satifying model for the formula.
-    Sat(Vec<i32>),
+    Sat(Vec<bool>),
 }
 
 impl Formula {
@@ -174,7 +174,7 @@ impl Formula {
                 }
 
                 if n_unsat_clauses == 0 {
-                    return Solution::Sat(curr_model);
+                    return Solution::Sat(curr_model.iter().map(|&x| x == 1).collect());
                 } else if n_unsat_clauses < best_n_unsat_clauses {
                     best_model.clone_from_slice(&curr_model);
                     best_n_unsat_clauses = n_unsat_clauses;
@@ -220,7 +220,7 @@ impl Formula {
             }
         }
 
-        Solution::Best(best_model)
+        Solution::Best(best_model.iter().map(|&x| x == 1).collect())
     }
 
     /// Simplify the formula by performing unit propagation
