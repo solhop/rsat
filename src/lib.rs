@@ -31,17 +31,17 @@ const C_BREAK: f32 = 3.6;
 
 /// A literal.
 #[derive(Debug, Clone)]
-pub struct Lit(i32);
+pub struct Lit(pub i32);
 
 /// A Clause.
 #[derive(Debug)]
-pub struct Clause(Vec<Lit>);
+pub struct Clause(pub Vec<Lit>);
 
 /// A SAT Formula
 #[derive(Debug)]
 pub struct Formula {
     num_vars: u32,
-    clauses: Vec<Clause>,
+    pub clauses: Vec<Clause>, // TODO Temp pub
 }
 
 /// Lifted Boolean
@@ -329,3 +329,6 @@ impl Formula {
         None
     }
 }
+
+/// msat, a complete solver based on MiniSAT
+pub mod msat;

@@ -56,4 +56,39 @@ fn main() {
             println!("0");
         }
     }
+
+    let mut solver = rsat::msat::Solver::new();
+
+    for _ in 0..formula.n_vars() {
+        solver.new_var();
+    }
+
+    for rsat::Clause(lits) in formula.clauses {
+        let mut cl = vec![];
+        for rsat::Lit(l) in lits {
+            let r = if l > 0 {
+                (2 * (l - 1)) as usize
+            } else {
+                (2 * (-l - 1) + 1) as usize
+            };
+            cl.push(rsat::msat::Lit(r));
+        }
+        if !solver.new_clause(cl) {
+            println!("UNSAT");
+            return;
+        }
+    }
+
+    if solver.solve() {
+        println!("SAT");
+        for v in 0..solver.n_vars() {
+            match solver.value(v) {
+                rsat::msat::LBool::False => print!("-{} ", v + 1),
+                _ => print!("{} ", v + 1),
+            }
+        }
+        println!("0");
+    } else {
+        println!("UNSAT");
+    }
 }
