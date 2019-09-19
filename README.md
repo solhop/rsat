@@ -1,5 +1,6 @@
 # rsat
-Local Search SAT Solver in Rust based on [probSAT](https://github.com/adrianopolus/probSAT).
+Local Search SAT and MaxSAT Solver in Rust based on [probSAT](https://github.com/adrianopolus/probSAT).
+Partial MaxSAT is not supported yet.
 
 [![Crates.io](https://img.shields.io/crates/v/rsat.svg)](https://crates.io/crates/rsat)
 [![Crates.io](https://img.shields.io/crates/d/rsat.svg)](https://crates.io/crates/rsat)
