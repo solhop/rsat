@@ -1,63 +1,6 @@
 use std::collections::VecDeque;
-use std::ops::Not;
 
-#[derive(Clone, Copy, PartialEq)]
-pub struct Lit(pub usize);
-
-impl Lit {
-    pub fn sign(self) -> bool {
-        self.0 & 1 == 1
-    }
-
-    pub fn var(self) -> usize {
-        self.0 >> 1
-    }
-
-    pub fn index(self) -> usize {
-        self.0
-    }
-}
-
-impl Not for Lit {
-    type Output = Self;
-
-    fn not(self) -> Self {
-        if self.0 % 2 == 0 {
-            Lit(self.0 + 1)
-        } else {
-            Lit(self.0 - 1)
-        }
-    }
-}
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum LBool {
-    True,
-    False,
-    Undef,
-}
-
-impl Not for LBool {
-    type Output = Self;
-
-    fn not(self) -> Self {
-        match self {
-            LBool::True => LBool::False,
-            LBool::False => LBool::True,
-            LBool::Undef => LBool::Undef,
-        }
-    }
-}
-
-impl From<bool> for LBool {
-    fn from(b: bool) -> Self {
-        if b {
-            LBool::True
-        } else {
-            LBool::False
-        }
-    }
-}
+use crate::common::*;
 
 pub struct Clause {
     lits: Vec<Lit>,
@@ -105,7 +48,7 @@ impl Solver {
         let index = self.n_vars();
         self.watches.push(vec![]);
         self.watches.push(vec![]);
-        self.assigns.push(LBool::Undef);
+        self.assigns.push(LBool::None);
         index
     }
 
@@ -154,7 +97,7 @@ impl Solver {
                     state[d] |= 1 << a;
                     self.assigns[d] = (a == 1).into();
                     if !self.update_watchlist(Lit(d << 1 | a)) {
-                        self.assigns[d] = LBool::Undef;
+                        self.assigns[d] = LBool::None;
                     } else {
                         d += 1;
                         break;
@@ -167,7 +110,7 @@ impl Solver {
                     return false;
                 } else {
                     state[d] = 0;
-                    self.assigns[d] = LBool::Undef;
+                    self.assigns[d] = LBool::None;
                     d -= 1;
                 }
             }
@@ -181,7 +124,7 @@ impl Solver {
             for &alt in self.clauses[cl_index].lits.iter() {
                 let v = alt.var();
                 let s = alt.sign();
-                if self.assigns[v] == LBool::Undef || self.assigns[v] == s.into() {
+                if self.assigns[v] == LBool::None || self.assigns[v] == s.into() {
                     found_alt = true;
                     self.watches[alt.index()].push(cl_index);
                     self.watches[false_lit.index()].pop();
