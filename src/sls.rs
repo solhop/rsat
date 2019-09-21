@@ -190,4 +190,21 @@ impl Formula {
             }
         }
     }
+
+    pub fn verify(&self, model: &[bool]) -> bool {
+        for Clause(cl) in self.clauses.iter() {
+            let mut cla_sat = false;
+            for &lit in cl.iter() {
+                let var = lit.var();
+                if lit.sign() != model[var] {
+                    cla_sat = true;
+                    break;
+                }
+            }
+            if !cla_sat {
+                return false;
+            }
+        }
+        true
+    }
 }

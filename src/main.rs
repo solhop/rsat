@@ -48,6 +48,9 @@ fn main() {
             println!("0");
         }
         Sat(solution) => {
+            if !formula.verify(&solution) {
+                panic!("Solver gave incorrect model");
+            }
             println!("SAT");
             let solution = solution.iter().map(|&x| if x { 1 } else { -1 });
             for (i, v) in solution.enumerate() {
