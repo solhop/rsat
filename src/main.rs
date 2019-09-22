@@ -1,8 +1,9 @@
 use clap::{App, Arg};
 
 fn main() {
+    let version = env!("CARGO_PKG_VERSION");
     let matches = App::new("rsat")
-        .version("0.1.1")
+        .version(version)
         .about("SolHOP SAT Solver")
         .arg(
             Arg::with_name("file")
