@@ -1,44 +1,31 @@
-use clap::{App, Arg};
+use std::path::PathBuf;
+use structopt::StructOpt;
+
+#[derive(Debug, StructOpt)]
+#[structopt(name="rsat", about=env!("CARGO_PKG_DESCRIPTION"), version=env!("CARGO_PKG_VERSION"))]
+struct Opt {
+    #[structopt(parse(from_os_str))]
+    file: PathBuf,
+    #[structopt(
+        long = "max-tries",
+        default_value = "100",
+        help = "Maximum number of tries"
+    )]
+    max_tries: u32,
+    #[structopt(
+        long = "max-flips",
+        default_value = "1000",
+        help = "Maxinum number of flips in each try"
+    )]
+    max_flips: u32,
+}
 
 fn main() {
-    let version = env!("CARGO_PKG_VERSION");
-    let matches = App::new("rsat")
-        .version(version)
-        .about("SolHOP SAT Solver")
-        .arg(
-            Arg::with_name("file")
-                .index(1)
-                .required(true)
-                .help("Input file"),
-        )
-        .arg(
-            Arg::with_name("max-tries")
-                .long("max-tries")
-                .takes_value(true)
-                .help("Maximum number of tries"),
-        )
-        .arg(
-            Arg::with_name("max-flips")
-                .long("max-flips")
-                .takes_value(true)
-                .help("Maxinum number of flips in each try"),
-        )
-        .get_matches();
-    let mut formula = match matches.value_of("file") {
-        None => panic!("File name is required"),
-        Some(input_file) => rsat::sls::Formula::new_from_file(input_file),
-    };
-    let max_tries = match matches.value_of("max-tries") {
-        None => 100,
-        Some(n) => n.parse().expect("Expected an integer"),
-    };
-    let max_flips = match matches.value_of("max-flips") {
-        None => 1000,
-        Some(n) => n.parse().expect("Expected an integer"),
-    };
+    let opt = Opt::from_args();
+    let mut formula = rsat::sls::Formula::new_from_file(opt.file.to_str().unwrap());
 
     use rsat::common::Solution::*;
-    match formula.local_search(max_tries, max_flips) {
+    match formula.local_search(opt.max_tries, opt.max_flips) {
         Unsat => println!("UNSAT"),
         Best(solution) => {
             println!("UNKNOWN");
