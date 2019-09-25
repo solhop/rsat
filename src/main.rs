@@ -4,7 +4,7 @@ use structopt::StructOpt;
 #[derive(Debug, StructOpt)]
 #[structopt(name="rsat", about=env!("CARGO_PKG_DESCRIPTION"), version=env!("CARGO_PKG_VERSION"))]
 struct Opt {
-    #[structopt(parse(from_os_str))]
+    #[structopt(parse(from_os_str), help = "Input file")]
     file: PathBuf,
     #[structopt(
         long = "max-tries",
