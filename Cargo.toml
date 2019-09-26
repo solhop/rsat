@@ -1,6 +1,6 @@
 [package]
 name = "rsat"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Prateek Kumar <prateek@prateekkumar.in>"]
 edition = "2018"
 description = """
@@ -10,7 +10,7 @@ documentation = "https://docs.rs/rsat/"
 homepage = "https://docs.rs/crate/rsat/"
 repository = "https://github.com/solhop/rsat"
 readme = "README.md"
-keywords = ["SAT", "MaxSAT", "cisfiability", "Solver", "Math"]
+keywords = ["SAT", "MaxSAT", "Satisfiability", "Solver", "Math"]
 categories = ["science"]
 license = "MIT"
 exclude = ["/.vscode/", "/.github/", "azure-pipelines.yml"]
