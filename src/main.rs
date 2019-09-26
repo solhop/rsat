@@ -25,7 +25,7 @@ fn main() {
     let mut formula = rsat::sls::Formula::new_from_file(opt.file.to_str().unwrap());
 
     use rsat::common::Solution::*;
-    match formula.local_search(opt.max_tries, opt.max_flips) {
+    match formula.local_search(opt.max_tries, opt.max_flips, rsat::sls::ScoreFnType::Exp) {
         Unsat => println!("UNSAT"),
         Best(solution) => {
             println!("UNKNOWN");

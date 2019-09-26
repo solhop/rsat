@@ -8,7 +8,14 @@ use std::io::BufRead;
 
 /// Magic numbers used by local search.
 const C_MAKE: f32 = 0.5;
-const C_BREAK: f32 = 3.6;
+const C_BREAK: f32 = 3.7;
+
+/// Scoring function type
+#[derive(Clone, Copy)]
+pub enum ScoreFnType {
+    Poly,
+    Exp,
+}
 
 /// A SAT Formula.
 pub struct Formula {
@@ -103,7 +110,12 @@ impl Formula {
 
     /// Local Search based on probSAT. Tries for `max_tries` times
     /// with `max_flips` flips in each try.
-    pub fn local_search(&mut self, max_tries: u32, max_flips: u32) -> Solution {
+    pub fn local_search(
+        &mut self,
+        max_tries: u32,
+        max_flips: u32,
+        score_fn_type: ScoreFnType,
+    ) -> Solution {
         let mut curr_model = vec![false; self.num_vars as usize];
         let mut best_model = vec![false; self.num_vars as usize];
         let mut best_n_unsat_clauses = self.clauses.len();
@@ -166,7 +178,10 @@ impl Formula {
                     }
                     curr_model[var_i] = !curr_model[var_i];
 
-                    scores[var_i] = C_MAKE.powi(make_count) / C_BREAK.powi(break_count);
+                    scores[var_i] = match score_fn_type {
+                        ScoreFnType::Poly => 1.0 / (1.0 + break_count as f32).powf(C_BREAK),
+                        ScoreFnType::Exp => C_MAKE.powi(make_count) / C_BREAK.powi(break_count),
+                    };
                 }
 
                 let dist_var = WeightedIndex::new(&scores).unwrap();

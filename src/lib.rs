@@ -14,7 +14,8 @@
 //!     2 -3 0
 //!     -3 0
 //!     ";
-//!     println!("{:?}", rsat::sls::Formula::new_from_buf_reader(&mut input.as_bytes()).local_search(10, 100));
+//!     println!("{:?}", rsat::sls::Formula::new_from_buf_reader(&mut input.as_bytes())
+//!         .local_search(10, 100, rsat::sls::ScoreFnType::Exp));
 //! }
 //! ```
 
