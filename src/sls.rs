@@ -13,7 +13,9 @@ const C_BREAK: f32 = 3.7;
 /// Scoring function type
 #[derive(Clone, Copy)]
 pub enum ScoreFnType {
+    /// Use polynomial scoring function.
     Poly,
+    /// Use exponential scoring function.
     Exp,
 }
 
@@ -206,6 +208,7 @@ impl Formula {
         }
     }
 
+    /// Verify that the clauses are satisfied by the input model.
     pub fn verify(&self, model: &[bool]) -> bool {
         for Clause(cl) in self.clauses.iter() {
             let mut cla_sat = false;

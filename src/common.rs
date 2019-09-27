@@ -38,8 +38,11 @@ impl Not for Lit {
 /// A Lifted boolean.
 #[derive(Clone, Copy, PartialEq)]
 pub enum LBool {
+    /// Represents True.
     True,
+    /// Represents False.
     False,
+    /// Represents neither True nor False, usually used when variable is unassigned.
     None,
 }
 
