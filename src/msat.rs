@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::collections::VecDeque;
 
 use crate::common::{Clause, LBool, Lit, Var};
@@ -76,13 +74,18 @@ impl Solver {
         v
     }
 
+    pub fn new_clause(&mut self, lits: Vec<Lit>) -> bool {
+        let (r, _) = self.clause_new(lits, false);
+        r
+    }
+
     fn varorder_new_var(&mut self) {}
 
     fn varorder_update(&mut self, _x: Var) {}
 
-    fn varorder_update_all(&mut self) {}
+    // fn varorder_update_all(&mut self) {}
 
-    fn varorder_undo(&mut self) {}
+    fn varorder_undo(&mut self, _x: Var) {}
 
     fn varorder_select(&mut self) -> Var {
         let mut max_i = 0;
@@ -96,12 +99,12 @@ impl Solver {
         max_i
     }
 
-    fn clause_locked(&self, ci: ClauseIndex) -> bool {
-        let cl = self.get_clause_ref(ci);
-        self.reason[cl.lits[0].var()] == Some(ci)
-    }
+    // fn clause_locked(&self, ci: ClauseIndex) -> bool {
+    //     let cl = self.get_clause_ref(ci);
+    //     self.reason[cl.lits[0].var()] == Some(ci)
+    // }
 
-    fn clause_remove(&mut self, _ci: ClauseIndex) {}
+    // fn clause_remove(&mut self, _ci: ClauseIndex) {}
 
     fn clause_propagate(&mut self, ci: ClauseIndex, p: Lit) -> bool {
         match ci {
@@ -165,30 +168,33 @@ impl Solver {
     }
 
     // Only called at top level with empty prop queue
-    fn clause_simplify(&mut self, ci: ClauseIndex) -> bool {
-        let mut j = 0;
-        let cl = self.get_clause_ref(ci);
-        let mut lits = cl.lits.clone();
-        for i in 0..lits.len() {
-            if self.value_lit(lits[i]) == LBool::True {
-                return true;
-            } else if self.value_lit(lits[i]) == LBool::Undef {
-                lits[j] = lits[i];
-                j += 1;
-            }
-        }
-        while lits.len() != j {
-            lits.pop();
-        }
-        self.get_clause_mut_ref(ci).lits = lits;
-        return false;
-    }
+    // fn clause_simplify(&mut self, ci: ClauseIndex) -> bool {
+    //     let mut j = 0;
+    //     let cl = self.get_clause_ref(ci);
+    //     let mut lits = cl.lits.clone();
+    //     for i in 0..lits.len() {
+    //         if self.value_lit(lits[i]) == LBool::True {
+    //             return true;
+    //         } else if self.value_lit(lits[i]) == LBool::Undef {
+    //             lits[j] = lits[i];
+    //             j += 1;
+    //         }
+    //     }
+    //     while lits.len() != j {
+    //         lits.pop();
+    //     }
+    //     self.get_clause_mut_ref(ci).lits = lits;
+    //     return false;
+    // }
 
     fn clause_undo(&mut self, _cl: ClauseIndex, _p: Lit) {}
 
     fn clause_calc_reason(&mut self, ci: ClauseIndex, p: Option<Lit>) -> Vec<Lit> {
         // Inv: p == None or p == cl.Lits[0]
-        let cl = self.get_clause_ref(ci);
+        let cl = match ci {
+            ClauseIndex::Orig(ci) => &self.clauses[ci],
+            ClauseIndex::Lrnt(ci) => &self.learnts[ci],
+        };
         let mut reason = vec![];
         for i in (if p == None { 0 } else { 1 })..cl.lits.len() {
             // Inv: self.value_lit(lits[i]) == FALSE
@@ -198,19 +204,12 @@ impl Solver {
         return reason;
     }
 
-    fn get_clause_ref(&self, ci: ClauseIndex) -> &Clause {
-        match ci {
-            ClauseIndex::Orig(ci) => &self.clauses[ci],
-            ClauseIndex::Lrnt(ci) => &self.learnts[ci],
-        }
-    }
-
-    fn get_clause_mut_ref(&mut self, ci: ClauseIndex) -> &mut Clause {
-        match ci {
-            ClauseIndex::Orig(ci) => &mut self.clauses[ci],
-            ClauseIndex::Lrnt(ci) => &mut self.learnts[ci],
-        }
-    }
+    // fn get_clause_ref(&self, ci: ClauseIndex) -> &Clause {
+    //     match ci {
+    //         ClauseIndex::Orig(ci) => &self.clauses[ci],
+    //         ClauseIndex::Lrnt(ci) => &self.learnts[ci],
+    //     }
+    // }
 
     fn clause_new(&mut self, mut ps: Vec<Lit>, learnt: bool) -> (bool, Option<ClauseIndex>) {
         if !learnt {
@@ -332,8 +331,9 @@ impl Solver {
             let p = self.prop_q.pop_back().unwrap();
             let tmp = self.watches[p.index()].clone();
             self.watches[p.index()].clear();
+
             for i in 0..tmp.len() {
-                if !self.propagate_clause(tmp[i], p) {
+                if !self.clause_propagate(tmp[i], p) {
                     // Contraint is conflicting
                     for j in i + 1..tmp.len() {
                         self.watches[p.index()].push(tmp[j]);
@@ -346,10 +346,6 @@ impl Solver {
         None
     }
 
-    fn propagate_clause(&mut self, c: ClauseIndex, p: Lit) -> bool {
-        unimplemented!()
-    }
-
     fn enqueue(&mut self, p: Lit, from: Option<ClauseIndex>) -> bool {
         if self.value_lit(p) != LBool::Undef {
             if self.value_lit(p) == LBool::False {
@@ -360,7 +356,7 @@ impl Solver {
         } else {
             self.assigns[p.var()] = LBool::from(!p.sign());
             self.level[p.var()] = self.decision_level();
-            // self.reason[p.var()] = from;
+            self.reason[p.var()] = from;
             self.trail.push(p);
             self.prop_q.push_back(p);
             return true;
@@ -368,10 +364,9 @@ impl Solver {
     }
 
     fn analyze(&mut self, mut confl: ClauseIndex) -> (Vec<Lit>, i32) {
-        // TODO Relook
         let mut seen = vec![false; self.n_vars()];
         let mut counter = 0;
-        let mut p = None; // Undef initially TODO
+        let mut p = None;
         let mut p_reason = vec![];
 
         let mut out_learnt = vec![Lit(0)]; // Change to asserting literal, later
@@ -380,6 +375,7 @@ impl Solver {
             p_reason.clear();
             p_reason = self.clause_calc_reason(confl, p); // Inv: confl != NULL
 
+            // Trace reason for p
             for j in 0..p_reason.len() {
                 let q = p_reason[j];
                 if !seen[q.var()] {
@@ -397,6 +393,7 @@ impl Solver {
                 }
             }
 
+            // Select next literal to look at
             loop {
                 p = self.trail.last().and_then(|&x| Some(x));
                 let v = p.unwrap().var();
@@ -412,20 +409,29 @@ impl Solver {
                 break;
             }
         }
+        out_learnt[0] = !(p.unwrap());
         (out_learnt, out_btlevel)
     }
 
     fn record(&mut self, clause: Vec<Lit>) {
-        // TODO Fix this
+        let asserting_lit = clause[0];
         let (_, c) = self.clause_new(clause, true);
-        if let Some(cl) = c {
-            // self.learnts.push(cl);
-        }
-        // self.enqueue(clause[0], c.and_then(|_| Some(self.learnts.len()-1)));
+        self.enqueue(asserting_lit, c);
     }
 
     fn undo_one(&mut self) {
-        unimplemented!()
+        let p = self.trail.last().and_then(|&x| Some(x)).unwrap();
+        let x = p.var();
+        self.assigns[x] = LBool::Undef;
+        self.reason[x] = None;
+        self.level[x] = -1;
+        self.varorder_undo(x);
+        self.trail.pop();
+
+        while self.undos[x].len() > 0 {
+            self.clause_undo(self.undos[x].last().and_then(|&x| Some(x)).unwrap(), p);
+            self.undos[x].pop();
+        }
     }
 
     fn assume(&mut self, p: Lit) -> bool {
@@ -500,9 +506,7 @@ impl Solver {
     }
 
     fn reduce_db(&mut self) {
-        let lim = self.cla_inc / self.learnts.len() as f64;
-
-        unimplemented!();
+        // unimplemented!();
     }
 
     fn simplify_db(&mut self) -> bool {
@@ -510,7 +514,8 @@ impl Solver {
             return false;
         }
 
-        unimplemented!();
+        // unimplemented!();
+        return true;
     }
 
     pub fn solve(&mut self, assumps: Vec<Lit>) -> bool {
