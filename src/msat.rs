@@ -383,14 +383,13 @@ impl Solver {
         let mut seen = vec![false; self.n_vars()];
         let mut counter = 0;
         let mut p = None;
-        let mut p_reason = vec![];
 
         let mut out_learnt = vec![Lit(0)]; // Change to asserting literal, later
         let mut out_btlevel = 0;
         loop {
-            p_reason.clear();
             debug_assert!(confl != None, "Conflit cannot be null");
-            p_reason = self.clause_calc_reason(confl.unwrap(), p); // Inv: confl != NULL
+            // Inv: confl != NULL
+            let p_reason = self.clause_calc_reason(confl.unwrap(), p);
 
             // Trace reason for p
             for j in 0..p_reason.len() {
@@ -488,6 +487,9 @@ impl Solver {
                 // Conflit
                 Some(c) => {
                     conflit_c += 1;
+                    if self.decision_level() == self.root_level {
+                        return (LBool::False, vec![]);
+                    }
                     let (learnt_clause, backtrack_level) = self.analyze(c);
                     self.cancel_until(if backtrack_level > self.root_level {
                         backtrack_level
@@ -565,13 +567,16 @@ impl Solver {
             let res = self.search(nof_conflicts as u32, nof_learnts as u32, params);
             status = res.0;
             model = res.1;
-            println!("Search status: {:?} {:?}", status, model);
             nof_conflicts *= 1.5;
             nof_learnts *= 1.1;
         }
 
         self.cancel_until(0);
 
-        return Solution::Sat(model);
+        if status == LBool::True {
+            Solution::Sat(model)
+        } else {
+            Solution::Unsat
+        }
     }
 }
