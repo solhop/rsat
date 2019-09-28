@@ -10,7 +10,7 @@ use std::io::BufRead;
 const C_MAKE: f32 = 0.5;
 const C_BREAK: f32 = 3.7;
 
-/// Scoring function type
+/// Scoring function type.
 #[derive(Clone, Copy)]
 pub enum ScoreFnType {
     /// Use polynomial scoring function.

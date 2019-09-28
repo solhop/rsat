@@ -8,6 +8,7 @@ enum ClauseIndex {
     Lrnt(usize),
 }
 
+/// Represents a CDCL solver.
 #[derive(Default)]
 pub struct Solver {
     clauses: Vec<Clause>,
@@ -30,6 +31,7 @@ pub struct Solver {
 }
 
 impl Solver {
+    /// Create a new CDCL solver.
     pub fn new() -> Self {
         let mut solver = Solver::default();
         solver.var_inc = 1.0;
@@ -37,26 +39,32 @@ impl Solver {
         solver
     }
 
+    /// Returns the number of variables in the formula.
     pub fn n_vars(&self) -> usize {
         self.assigns.len()
     }
 
+    /// Returns the number of assigned variables in the formula.
     pub fn n_assigns(&self) -> usize {
         self.trail.len()
     }
 
+    /// Returns the number of original clauses in the formula.
     pub fn n_clauses(&self) -> usize {
         self.clauses.len()
     }
 
+    /// Returns the number of learnt clauses in the formula.
     pub fn n_learnts(&self) -> usize {
         self.learnts.len()
     }
 
+    /// Returns the assignment of the variable.
     pub fn value(&self, x: Var) -> LBool {
         self.assigns[x]
     }
 
+    /// Returns the value of the literal under current partial assignment.
     pub fn value_lit(&self, p: Lit) -> LBool {
         if p.sign() {
             !self.assigns[p.var()]
@@ -65,10 +73,12 @@ impl Solver {
         }
     }
 
+    /// Returns the current decision level in the solver.
     pub fn decision_level(&self) -> i32 {
         self.trail_lim.len() as i32
     }
 
+    /// Add a new variable to the solver.
     pub fn new_var(&mut self) -> Var {
         let v = self.n_vars();
         self.watches.push(vec![]);
@@ -82,6 +92,7 @@ impl Solver {
         v
     }
 
+    /// Add a new clause to the solver.
     pub fn new_clause(&mut self, lits: Vec<Lit>) -> bool {
         let (r, _) = self.clause_new(lits, false);
         r
@@ -98,10 +109,10 @@ impl Solver {
     fn varorder_select(&mut self) -> Var {
         let mut max_i = 0;
         for i in 0..self.activity.len() {
-            if self.value(i) == LBool::Undef {
-                if self.value(max_i) != LBool::Undef || self.activity[i] > self.activity[max_i] {
-                    max_i = i;
-                }
+            if self.value(i) == LBool::Undef
+                && (self.value(max_i) != LBool::Undef || self.activity[i] > self.activity[max_i])
+            {
+                max_i = i;
             }
         }
         max_i
@@ -193,7 +204,7 @@ impl Solver {
             lits.pop();
         }
         self.get_clause_mut_ref(ci).lits = lits;
-        return false;
+        false
     }
 
     fn clause_undo(&mut self, _cl: ClauseIndex, _p: Lit) {}
@@ -209,7 +220,7 @@ impl Solver {
             reason.push(!cl.lits[i]);
         }
         self.cla_bump_activity(ci);
-        return reason;
+        reason
     }
 
     fn get_clause_ref(&self, ci: ClauseIndex) -> &Clause {
@@ -249,15 +260,15 @@ impl Solver {
             // Remove all false lits from ps
             ps = ps
                 .iter()
-                .map(|&l| l)
+                .copied()
                 .filter(|&l| self.value_lit(l) == LBool::Undef)
                 .collect();
         }
 
-        if ps.len() == 0 {
-            return (false, None);
+        if ps.is_empty() {
+            (false, None)
         } else if ps.len() == 1 {
-            return (self.enqueue(ps[0], None), None);
+            (self.enqueue(ps[0], None), None)
         } else {
             if learnt {
                 // Index of the lit with highest decision level
@@ -269,9 +280,7 @@ impl Solver {
                 }
 
                 // Pick second variable to watch
-                let tmp = ps[1];
-                ps[1] = ps[max_i];
-                ps[max_i] = tmp;
+                ps.swap(1, max_i);
             }
 
             let ci = if !learnt {
@@ -284,8 +293,8 @@ impl Solver {
                 let ci = ClauseIndex::Lrnt(self.learnts.len());
                 self.watches[(!ps[0]).index()].push(ci);
                 self.watches[(!ps[1]).index()].push(ci);
-                for i in 0..ps.len() {
-                    self.var_bump_activity(ps[i].var());
+                for p in &ps {
+                    self.var_bump_activity(p.var());
                 }
                 self.learnts.push(Clause { lits: ps });
                 self.cla_activity.push(0.0);
@@ -293,7 +302,7 @@ impl Solver {
                 ci
             };
 
-            return (true, Some(ci));
+            (true, Some(ci))
         }
     }
 
@@ -342,7 +351,7 @@ impl Solver {
     }
 
     fn propagate(&mut self) -> Option<ClauseIndex> {
-        while self.prop_q.len() > 0 {
+        while !self.prop_q.is_empty() {
             let p = self.prop_q.pop_back().unwrap();
             let tmp = self.watches[p.index()].clone();
             self.watches[p.index()].clear();
@@ -350,8 +359,8 @@ impl Solver {
             for i in 0..tmp.len() {
                 if !self.clause_propagate(tmp[i], p) {
                     // Contraint is conflicting
-                    for j in i + 1..tmp.len() {
-                        self.watches[p.index()].push(tmp[j]);
+                    for &c_i in tmp.iter().skip(i + 1) {
+                        self.watches[p.index()].push(c_i);
                     }
                     self.prop_q.clear();
                     return Some(tmp[i]);
@@ -363,18 +372,14 @@ impl Solver {
 
     fn enqueue(&mut self, p: Lit, from: Option<ClauseIndex>) -> bool {
         if self.value_lit(p) != LBool::Undef {
-            if self.value_lit(p) == LBool::False {
-                return false;
-            } else {
-                return true;
-            }
+            !(self.value_lit(p) == LBool::False)
         } else {
             self.assigns[p.var()] = LBool::from(!p.sign());
             self.level[p.var()] = self.decision_level();
             self.reason[p.var()] = from;
             self.trail.push(p);
             self.prop_q.push_back(p);
-            return true;
+            true
         }
     }
 
@@ -392,8 +397,7 @@ impl Solver {
             let p_reason = self.clause_calc_reason(confl.unwrap(), p);
 
             // Trace reason for p
-            for j in 0..p_reason.len() {
-                let q = p_reason[j];
+            for q in p_reason {
                 if !seen[q.var()] {
                     seen[q.var()] = true;
                     if self.level[q.var()] == self.decision_level() {
@@ -444,7 +448,7 @@ impl Solver {
         self.varorder_undo(x);
         self.trail.pop();
 
-        while self.undos[x].len() > 0 {
+        while !self.undos[x].is_empty() {
             self.clause_undo(self.undos[x].last().and_then(|&x| Some(x)).unwrap(), p);
             self.undos[x].pop();
         }
@@ -479,7 +483,6 @@ impl Solver {
         let mut conflit_c = 0;
         self.var_decay = 1.0 / params.0;
         self.cla_decay = 1.0 / params.1;
-        let mut model = vec![true; self.n_vars()];
 
         loop {
             let confl = self.propagate();
@@ -511,9 +514,7 @@ impl Solver {
 
                     if self.n_assigns() == self.n_vars() {
                         // Model found
-                        for i in 0..model.len() {
-                            model[i] = self.value(i) == LBool::True;
-                        }
+                        let model = self.assigns.iter().map(|&x| x == LBool::True).collect();
                         self.cancel_until(self.root_level);
                         return (LBool::True, model);
                     } else if conflit_c >= nof_conflicts {
@@ -534,14 +535,15 @@ impl Solver {
     }
 
     fn simplify_db(&mut self) -> bool {
-        if let Some(_) = self.propagate() {
+        if self.propagate().is_some() {
             return false;
         }
 
         // unimplemented!();
-        return true;
+        true
     }
 
+    /// Solve the SAT formula under given assumptions.
     pub fn solve(&mut self, assumps: Vec<Lit>) -> Solution {
         let params = (0.95, 0.999);
         let mut nof_conflicts = 100.0;
@@ -549,11 +551,8 @@ impl Solver {
         let mut status = LBool::Undef;
 
         // Push incremental assumptions
-        for i in 0..assumps.len() {
-            if !self.assume(assumps[i]) {
-                self.cancel_until(0);
-                return Solution::Unsat;
-            } else if let Some(_) = self.propagate() {
+        for assump in assumps {
+            if !self.assume(assump) || self.propagate().is_some() {
                 self.cancel_until(0);
                 return Solution::Unsat;
             }

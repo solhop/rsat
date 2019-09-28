@@ -19,11 +19,13 @@
 //! }
 //! ```
 
-/// Common utils
+#![deny(missing_docs)]
+
+/// Common utils.
 pub mod common;
 
-/// sls, a local search solver module
+/// sls, a local search solver module.
 pub mod sls;
 
-// msat, a complete solver module
+/// msat, a complete CDCL solver module.
 pub mod msat;

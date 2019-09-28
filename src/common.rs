@@ -78,6 +78,7 @@ impl From<bool> for LBool {
 /// A Clause.
 #[derive(Clone)]
 pub struct Clause {
+    /// A vector of literals forming the clause.
     pub lits: Vec<Lit>,
 }
 
