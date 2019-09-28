@@ -4,7 +4,7 @@ use std::ops::Not;
 pub type Var = usize;
 
 /// A literal.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Lit(pub usize);
 
 impl Lit {
@@ -40,7 +40,7 @@ impl Not for Lit {
 }
 
 /// A Lifted boolean.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum LBool {
     /// Represents True.
     True,
@@ -76,6 +76,7 @@ impl From<bool> for LBool {
 }
 
 /// A Clause.
+#[derive(Clone)]
 pub struct Clause {
     pub lits: Vec<Lit>,
 }

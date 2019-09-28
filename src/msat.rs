@@ -1,13 +1,14 @@
 use std::collections::VecDeque;
 
-use crate::common::{Clause, LBool, Lit, Var};
+use crate::common::{Clause, LBool, Lit, Solution, Var};
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 enum ClauseIndex {
     Orig(usize),
     Lrnt(usize),
 }
 
+#[derive(Default)]
 pub struct Solver {
     clauses: Vec<Clause>,
     learnts: Vec<Clause>,
@@ -29,6 +30,13 @@ pub struct Solver {
 }
 
 impl Solver {
+    pub fn new() -> Self {
+        let mut solver = Solver::default();
+        solver.var_inc = 1.0;
+        solver.cla_inc = 1.0;
+        solver
+    }
+
     pub fn n_vars(&self) -> usize {
         self.assigns.len()
     }
@@ -53,7 +61,7 @@ impl Solver {
         if p.sign() {
             !self.assigns[p.var()]
         } else {
-            !self.assigns[p.var()]
+            self.assigns[p.var()]
         }
     }
 
@@ -91,7 +99,7 @@ impl Solver {
         let mut max_i = 0;
         for i in 0..self.activity.len() {
             if self.value(i) == LBool::Undef {
-                if self.value(max_i) == LBool::Undef || self.activity[i] > self.activity[max_i] {
+                if self.value(max_i) != LBool::Undef || self.activity[i] > self.activity[max_i] {
                     max_i = i;
                 }
             }
@@ -168,48 +176,55 @@ impl Solver {
     }
 
     // Only called at top level with empty prop queue
-    // fn clause_simplify(&mut self, ci: ClauseIndex) -> bool {
-    //     let mut j = 0;
-    //     let cl = self.get_clause_ref(ci);
-    //     let mut lits = cl.lits.clone();
-    //     for i in 0..lits.len() {
-    //         if self.value_lit(lits[i]) == LBool::True {
-    //             return true;
-    //         } else if self.value_lit(lits[i]) == LBool::Undef {
-    //             lits[j] = lits[i];
-    //             j += 1;
-    //         }
-    //     }
-    //     while lits.len() != j {
-    //         lits.pop();
-    //     }
-    //     self.get_clause_mut_ref(ci).lits = lits;
-    //     return false;
-    // }
+    #[allow(dead_code)]
+    fn clause_simplify(&mut self, ci: ClauseIndex) -> bool {
+        let mut j = 0;
+        let cl = self.get_clause_ref(ci);
+        let mut lits = cl.lits.clone();
+        for i in 0..lits.len() {
+            if self.value_lit(lits[i]) == LBool::True {
+                return true;
+            } else if self.value_lit(lits[i]) == LBool::Undef {
+                lits[j] = lits[i];
+                j += 1;
+            }
+        }
+        while lits.len() != j {
+            lits.pop();
+        }
+        self.get_clause_mut_ref(ci).lits = lits;
+        return false;
+    }
 
     fn clause_undo(&mut self, _cl: ClauseIndex, _p: Lit) {}
 
     fn clause_calc_reason(&mut self, ci: ClauseIndex, p: Option<Lit>) -> Vec<Lit> {
         // Inv: p == None or p == cl.Lits[0]
-        let cl = match ci {
-            ClauseIndex::Orig(ci) => &self.clauses[ci],
-            ClauseIndex::Lrnt(ci) => &self.learnts[ci],
-        };
+        let cl = self.get_clause_ref(ci);
+        debug_assert!(p == None || p == Some(cl.lits[0]));
         let mut reason = vec![];
         for i in (if p == None { 0 } else { 1 })..cl.lits.len() {
             // Inv: self.value_lit(lits[i]) == FALSE
+            debug_assert!(self.value_lit(cl.lits[i]) == LBool::False);
             reason.push(!cl.lits[i]);
         }
         self.cla_bump_activity(ci);
         return reason;
     }
 
-    // fn get_clause_ref(&self, ci: ClauseIndex) -> &Clause {
-    //     match ci {
-    //         ClauseIndex::Orig(ci) => &self.clauses[ci],
-    //         ClauseIndex::Lrnt(ci) => &self.learnts[ci],
-    //     }
-    // }
+    fn get_clause_ref(&self, ci: ClauseIndex) -> &Clause {
+        match ci {
+            ClauseIndex::Orig(ci) => &self.clauses[ci],
+            ClauseIndex::Lrnt(ci) => &self.learnts[ci],
+        }
+    }
+
+    fn get_clause_mut_ref(&mut self, ci: ClauseIndex) -> &mut Clause {
+        match ci {
+            ClauseIndex::Orig(ci) => &mut self.clauses[ci],
+            ClauseIndex::Lrnt(ci) => &mut self.learnts[ci],
+        }
+    }
 
     fn clause_new(&mut self, mut ps: Vec<Lit>, learnt: bool) -> (bool, Option<ClauseIndex>) {
         if !learnt {
@@ -235,7 +250,7 @@ impl Solver {
             ps = ps
                 .iter()
                 .map(|&l| l)
-                .filter(|&l| self.value_lit(l) == LBool::False)
+                .filter(|&l| self.value_lit(l) == LBool::Undef)
                 .collect();
         }
 
@@ -259,7 +274,7 @@ impl Solver {
                 ps[max_i] = tmp;
             }
 
-            let ci = if learnt {
+            let ci = if !learnt {
                 let ci = ClauseIndex::Orig(self.clauses.len());
                 self.watches[(!ps[0]).index()].push(ci);
                 self.watches[(!ps[1]).index()].push(ci);
@@ -363,7 +378,8 @@ impl Solver {
         }
     }
 
-    fn analyze(&mut self, mut confl: ClauseIndex) -> (Vec<Lit>, i32) {
+    fn analyze(&mut self, cf: ClauseIndex) -> (Vec<Lit>, i32) {
+        let mut confl = Some(cf);
         let mut seen = vec![false; self.n_vars()];
         let mut counter = 0;
         let mut p = None;
@@ -373,7 +389,8 @@ impl Solver {
         let mut out_btlevel = 0;
         loop {
             p_reason.clear();
-            p_reason = self.clause_calc_reason(confl, p); // Inv: confl != NULL
+            debug_assert!(confl != None, "Conflit cannot be null");
+            p_reason = self.clause_calc_reason(confl.unwrap(), p); // Inv: confl != NULL
 
             // Trace reason for p
             for j in 0..p_reason.len() {
@@ -397,7 +414,7 @@ impl Solver {
             loop {
                 p = self.trail.last().and_then(|&x| Some(x));
                 let v = p.unwrap().var();
-                confl = self.reason[v].unwrap();
+                confl = self.reason[v];
                 self.undo_one();
                 if seen[v] {
                     break;
@@ -454,7 +471,12 @@ impl Solver {
         }
     }
 
-    fn search(&mut self, nof_conflicts: u32, nof_learnts: u32, params: (f64, f64)) -> LBool {
+    fn search(
+        &mut self,
+        nof_conflicts: u32,
+        nof_learnts: u32,
+        params: (f64, f64),
+    ) -> (LBool, Vec<bool>) {
         let mut conflit_c = 0;
         self.var_decay = 1.0 / params.0;
         self.cla_decay = 1.0 / params.1;
@@ -491,10 +513,10 @@ impl Solver {
                             model[i] = self.value(i) == LBool::True;
                         }
                         self.cancel_until(self.root_level);
-                        return LBool::True;
+                        return (LBool::True, model);
                     } else if conflit_c >= nof_conflicts {
                         self.cancel_until(self.root_level); // Force a restart
-                        return LBool::Undef;
+                        return (LBool::Undef, vec![]);
                     } else {
                         // New variable decision
                         let p = Lit::new(self.varorder_select(), false);
@@ -518,7 +540,7 @@ impl Solver {
         return true;
     }
 
-    pub fn solve(&mut self, assumps: Vec<Lit>) -> bool {
+    pub fn solve(&mut self, assumps: Vec<Lit>) -> Solution {
         let params = (0.95, 0.999);
         let mut nof_conflicts = 100.0;
         let mut nof_learnts: f64 = (self.n_clauses() as f64) / 3.0;
@@ -528,23 +550,28 @@ impl Solver {
         for i in 0..assumps.len() {
             if !self.assume(assumps[i]) {
                 self.cancel_until(0);
-                return false;
+                return Solution::Unsat;
             } else if let Some(_) = self.propagate() {
                 self.cancel_until(0);
-                return false;
+                return Solution::Unsat;
             }
         }
         self.root_level = self.decision_level();
 
+        let mut model = vec![];
+
         // Solve
         while status == LBool::Undef {
-            status = self.search(nof_conflicts as u32, nof_learnts as u32, params);
+            let res = self.search(nof_conflicts as u32, nof_learnts as u32, params);
+            status = res.0;
+            model = res.1;
+            println!("Search status: {:?} {:?}", status, model);
             nof_conflicts *= 1.5;
             nof_learnts *= 1.1;
         }
 
         self.cancel_until(0);
 
-        return status == LBool::True;
+        return Solution::Sat(model);
     }
 }

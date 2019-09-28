@@ -105,6 +105,11 @@ impl Formula {
         self.clauses.len()
     }
 
+    /// Return's ith clause
+    pub fn ith_clause(&self, i: usize) -> &Clause {
+        &self.clauses[i]
+    }
+
     /// Add a clause to the formula.
     pub fn add_clause(&mut self, lits: Vec<Lit>) {
         self.clauses.push(Clause { lits });
