@@ -1,6 +1,9 @@
 # rsat
-Local Search SAT and MaxSAT Solver in Rust based on [probSAT](https://github.com/adrianopolus/probSAT).
-Partial MaxSAT is not supported yet.
+
+SolHop SAT and MaxSAT Solver.
+
+Currently, a stochastic local search based on probSAT and a CDCL solver based on MiniSAT
+has been implemented. More algorithms will be available soon.
 
 [![Crates.io](https://img.shields.io/crates/v/rsat.svg)](https://crates.io/crates/rsat)
 [![Crates.io](https://img.shields.io/crates/d/rsat.svg)](https://crates.io/crates/rsat)
@@ -15,15 +18,27 @@ Partial MaxSAT is not supported yet.
 $ cargo install rsat
 ```
 
-### Run
+### Help
 
 ```sh
-$ rsat input.cnf --max-tries=100 --max-flips=1000
+$ rsat --help
 ```
 
-where `input.cnf` contains the input SAT instance to be solved in DIMACS format.
+### Usage
 
-### Example input
+```sh
+$ rsat input.cnf -a 1
+```
+
+where `input.cnf` is the input SAT instance in DIMACS format.
+Use `-a 2` to invoke the SLS solver.
+Also see [help](#Help) for some options.
+
+Below are some examples:
+
+#### Example 1
+
+##### Input
 
 ```
 c comment
@@ -34,11 +49,38 @@ p cnf 3 4
 -3 0
 ```
 
-### Example Output
+##### Output
 
 ```
 SAT
 1 -2 -3 0
+```
+
+#### Example 2
+
+##### Input
+
+```
+c comment
+p cnf 3 4
+1 0
+-1 -2 0
+2 -3 0
+3 0
+```
+
+##### Output
+
+```
+UNSAT
+```
+
+Note: The SLS solver will never be available to prove UNSAT.
+It will give the best model that has been found so far.
+
+```
+UNKNOWN
+-1 2 3 0
 ```
 
 ## License

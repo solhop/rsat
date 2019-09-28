@@ -1,7 +1,5 @@
 //! `rsat` is a SAT and MaxSAT Solver.
 //!
-//! Currently, it implements Local Search based on probSAT.
-//!
 //! ## An example
 //!
 //! ```rust
