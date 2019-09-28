@@ -26,4 +26,4 @@ pub mod common;
 pub mod sls;
 
 // msat, a complete solver module
-// pub mod msat;
+pub mod msat;

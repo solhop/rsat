@@ -7,15 +7,22 @@ struct Opt {
     #[structopt(parse(from_os_str), help = "Input file")]
     file: PathBuf,
     #[structopt(
+        short,
+        long,
+        default_value = "1",
+        help = "Algorithm to use (1 -> CDCL, 2 -> SLS)"
+    )]
+    alg: u32,
+    #[structopt(
         long = "max-tries",
         default_value = "100",
-        help = "Maximum number of tries"
+        help = "Maximum number of tries for SLS"
     )]
     max_tries: u32,
     #[structopt(
         long = "max-flips",
         default_value = "1000",
-        help = "Maxinum number of flips in each try"
+        help = "Maxinum number of flips in each try of SLS"
     )]
     max_flips: u32,
 }
@@ -25,7 +32,26 @@ fn main() {
     let mut formula = rsat::sls::Formula::new_from_file(opt.file.to_str().unwrap());
 
     use rsat::common::Solution::*;
-    match formula.local_search(opt.max_tries, opt.max_flips, rsat::sls::ScoreFnType::Exp) {
+    let solution = match opt.alg {
+        1 => {
+            let mut solver = rsat::msat::Solver::new();
+            for _ in 0..formula.n_vars() {
+                solver.new_var();
+            }
+            for i in 0..formula.n_clauses() {
+                let c = formula.ith_clause(i);
+                let r = solver.new_clause(c.lits.clone());
+                if !r {
+                    println!("UNSAT");
+                    return;
+                }
+            }
+            solver.solve(vec![])
+        }
+        2 => formula.local_search(opt.max_tries, opt.max_flips, rsat::sls::ScoreFnType::Exp),
+        _ => panic!("Invalid algorithm"),
+    };
+    match solution {
         Unsat => println!("UNSAT"),
         Best(solution) => {
             println!("UNKNOWN");
