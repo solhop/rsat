@@ -106,8 +106,8 @@ impl Formula {
     }
 
     /// Add a clause to the formula.
-    pub fn add_clause(&mut self, cl: Vec<Lit>) {
-        self.clauses.push(Clause(cl));
+    pub fn add_clause(&mut self, lits: Vec<Lit>) {
+        self.clauses.push(Clause { lits });
     }
 
     /// Local Search based on probSAT. Tries for `max_tries` times
@@ -134,7 +134,7 @@ impl Formula {
             );
             for _ in 0..max_flips {
                 let mut n_unsat_clauses = 0;
-                for (i, Clause(cl)) in self.clauses.iter().enumerate() {
+                for (i, Clause { lits: cl }) in self.clauses.iter().enumerate() {
                     clause_unsat[i] = 1;
                     for &lit in cl {
                         let var = lit.var();
@@ -156,7 +156,7 @@ impl Formula {
                 let dist = WeightedIndex::new(&clause_unsat).unwrap();
                 let selected_clause = dist.sample(&mut rng);
 
-                let Clause(cl) = &self.clauses[selected_clause];
+                let Clause { lits: cl } = &self.clauses[selected_clause];
                 let mut scores = vec![0.0; self.num_vars as usize];
                 for x in cl {
                     let var_i = x.var();
@@ -164,7 +164,7 @@ impl Formula {
                     let mut break_count = 0;
 
                     curr_model[var_i] = !curr_model[var_i];
-                    for (i, Clause(cl)) in self.clauses.iter().enumerate() {
+                    for (i, Clause { lits: cl }) in self.clauses.iter().enumerate() {
                         let mut cl_unsat = 1;
                         for &lit in cl {
                             let var = lit.var();
@@ -214,7 +214,7 @@ impl Formula {
 
     /// Verify that the clauses are satisfied by the input model.
     pub fn verify(&self, model: &[bool]) -> bool {
-        for Clause(cl) in self.clauses.iter() {
+        for Clause { lits: cl } in self.clauses.iter() {
             let mut cla_sat = false;
             for &lit in cl.iter() {
                 let var = lit.var();

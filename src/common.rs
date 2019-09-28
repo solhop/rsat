@@ -76,7 +76,9 @@ impl From<bool> for LBool {
 }
 
 /// A Clause.
-pub struct Clause(pub Vec<Lit>);
+pub struct Clause {
+    pub lits: Vec<Lit>,
+}
 
 /// Solution to the SAT Formula.
 #[derive(Debug)]
