@@ -1,5 +1,8 @@
 use std::ops::Not;
 
+/// A variable.
+pub type Var = usize;
+
 /// A literal.
 #[derive(Clone, Copy, PartialEq)]
 pub struct Lit(pub usize);
@@ -11,7 +14,7 @@ impl Lit {
     }
 
     /// Returns the var cooressponding to the literal.
-    pub fn var(self) -> usize {
+    pub fn var(self) -> Var {
         self.0 >> 1
     }
 
@@ -20,6 +23,11 @@ impl Lit {
     pub fn index(self) -> usize {
         self.0
     }
+
+    /// Create lit from var and sign
+    pub fn new(var: Var, sign: bool) -> Lit {
+        Lit(var + var + (sign as usize))
+    }
 }
 
 impl Not for Lit {
@@ -27,11 +35,7 @@ impl Not for Lit {
 
     /// Returns x for -x and -x for x.
     fn not(self) -> Self {
-        if self.0 % 2 == 0 {
-            Lit(self.0 + 1)
-        } else {
-            Lit(self.0 - 1)
-        }
+        Lit(self.0 ^ 1)
     }
 }
 
@@ -43,19 +47,19 @@ pub enum LBool {
     /// Represents False.
     False,
     /// Represents neither True nor False, usually used when variable is unassigned.
-    None,
+    Undef,
 }
 
 impl Not for LBool {
     type Output = Self;
 
     /// Returns True for False and False for True.
-    /// If the input is None, then None is returned.
+    /// If the input is Undef, then Undef is returned.
     fn not(self) -> Self {
         match self {
             LBool::True => LBool::False,
             LBool::False => LBool::True,
-            LBool::None => LBool::None,
+            LBool::Undef => LBool::Undef,
         }
     }
 }

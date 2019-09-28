@@ -127,7 +127,11 @@ impl Formula {
         let mut rng = thread_rng();
 
         for _ in 0..max_tries {
-            Formula::gen_rand_model(&mut curr_model, &mut rng, &vec![LBool::None; self.num_vars]);
+            Formula::gen_rand_model(
+                &mut curr_model,
+                &mut rng,
+                &vec![LBool::Undef; self.num_vars],
+            );
             for _ in 0..max_flips {
                 let mut n_unsat_clauses = 0;
                 for (i, Clause(cl)) in self.clauses.iter().enumerate() {
@@ -201,7 +205,7 @@ impl Formula {
     {
         for (i, v) in model.iter_mut().enumerate() {
             match l_model[i] {
-                LBool::None => *v = 2 * rng.gen_range(0, 2) - 1 == 1,
+                LBool::Undef => *v = 2 * rng.gen_range(0, 2) - 1 == 1,
                 LBool::True => *v = true,
                 LBool::False => *v = false,
             }
