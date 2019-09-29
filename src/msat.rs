@@ -212,7 +212,6 @@ impl Solver {
     }
 
     // Only called at top level with empty prop queue
-    #[allow(dead_code)]
     fn clause_simplify(&mut self, ci: ClauseIndex) -> bool {
         let mut j = 0;
         let cl = self.get_clause_ref(ci);
@@ -594,7 +593,13 @@ impl Solver {
             return false;
         }
 
-        // unimplemented!();
+        let cls: Vec<_> = self.learnts.iter().map(|(&i, _)| i).collect();
+
+        for i in cls {
+            if self.clause_simplify(ClauseIndex::Lrnt(i)) {
+                self.clause_remove_learnt(ClauseIndex::Lrnt(i));
+            }
+        }
         true
     }
 
