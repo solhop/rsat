@@ -518,7 +518,14 @@ impl Solver {
                         self.cancel_until(self.root_level);
                         return (LBool::True, model);
                     } else if conflit_c >= nof_conflicts {
-                        self.cancel_until(self.root_level); // Force a restart
+                        // Force a restart
+                        self.cancel_until(self.root_level);
+                        // println!(
+                        //     "c Restarting after {} conflicts, learnt {}, clauses {}",
+                        //     conflit_c,
+                        //     self.learnts.len(),
+                        //     self.clauses.len()
+                        // );
                         return (LBool::Undef, vec![]);
                     } else {
                         // New variable decision
@@ -546,7 +553,8 @@ impl Solver {
     /// Solve the SAT formula under given assumptions.
     pub fn solve(&mut self, assumps: Vec<Lit>) -> Solution {
         let params = (0.95, 0.999);
-        let mut nof_conflicts = 100.0;
+        let restart_first = 100.0;
+        let restart_inc = 2.0;
         let mut nof_learnts: f64 = (self.n_clauses() as f64) / 3.0;
         let mut status = LBool::Undef;
 
@@ -562,12 +570,20 @@ impl Solver {
         let mut model = vec![];
 
         // Solve
+        let mut curr_restarts = 0;
+        let use_luby = true;
         while status == LBool::Undef {
+            let rest_base = if use_luby {
+                luby(restart_inc, curr_restarts)
+            } else {
+                restart_inc.powi(curr_restarts)
+            };
+            let nof_conflicts = rest_base * restart_first;
             let res = self.search(nof_conflicts as u32, nof_learnts as u32, params);
             status = res.0;
             model = res.1;
-            nof_conflicts *= 1.5;
             nof_learnts *= 1.1;
+            curr_restarts += 1;
         }
 
         self.cancel_until(0);
@@ -578,4 +594,21 @@ impl Solver {
             Solution::Unsat
         }
     }
+}
+
+fn luby(y: f64, mut x: i32) -> f64 {
+    let mut size = 1;
+    let mut seq = 0;
+    while size < x + 1 {
+        seq += 1;
+        size = 2 * size + 1;
+    }
+
+    while size - 1 != x {
+        size = (size - 1) >> 1;
+        seq -= 1;
+        x %= size;
+    }
+
+    y.powi(seq)
 }
