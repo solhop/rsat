@@ -2,7 +2,8 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name="rsat", about=env!("CARGO_PKG_DESCRIPTION"), version=env!("CARGO_PKG_VERSION"))]
+#[structopt(name="rsat", about=env!("CARGO_PKG_DESCRIPTION"), version=env!("CARGO_PKG_VERSION"),
+setting=structopt::clap::AppSettings::ColoredHelp)]
 struct Opt {
     #[structopt(parse(from_os_str), help = "Input file in DIMACS format")]
     file: PathBuf,
