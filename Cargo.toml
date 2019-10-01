@@ -22,3 +22,4 @@ maintenance = { status = "actively-developed" }
 regex = "1"
 rand = "0.7"
 structopt = "0.3"
+rayon = "1.2"
