@@ -123,6 +123,7 @@ impl Formula {
         max_tries: u32,
         max_flips: u32,
         score_fn_type: ScoreFnType,
+        parallel: bool,
     ) -> Solution {
         let mut curr_model = vec![false; self.num_vars as usize];
         let mut best_model = vec![false; self.num_vars as usize];
@@ -138,35 +139,43 @@ impl Formula {
                 &mut rng,
                 &vec![LBool::Undef; self.num_vars],
             );
+
             for _ in 0..max_flips {
-                let n_unsat_clauses = self
-                    .clauses
-                    .par_iter()
-                    .zip(clause_unsat.par_iter_mut())
-                    .map(|(cl, cl_us)| {
-                        let mut clause_unsat = 1;
-                        for lit in &cl.lits {
-                            let var = lit.var();
-                            if lit.sign() != curr_model[var] {
-                                clause_unsat = 0;
-                                break;
+                let n_unsat_clauses = if parallel {
+                    self.clauses
+                        .par_iter()
+                        .zip(clause_unsat.par_iter_mut())
+                        .map(|(cl, cl_us)| {
+                            let mut clause_unsat = 1;
+                            for lit in &cl.lits {
+                                let var = lit.var();
+                                if lit.sign() != curr_model[var] {
+                                    clause_unsat = 0;
+                                    break;
+                                }
                             }
-                        }
-                        *cl_us = clause_unsat;
-                        clause_unsat
-                    })
-                    .sum();
-                // for (i, Clause { lits: cl }) in self.clauses.iter().enumerate() {
-                //     clause_unsat[i] = 1;
-                //     for &lit in cl {
-                //         let var = lit.var();
-                //         if lit.sign() != curr_model[var] {
-                //             clause_unsat[i] = 0;
-                //             break;
-                //         }
-                //     }
-                //     n_unsat_clauses += clause_unsat[i];
-                // }
+                            *cl_us = clause_unsat;
+                            clause_unsat
+                        })
+                        .sum()
+                } else {
+                    self.clauses
+                        .iter()
+                        .zip(clause_unsat.iter_mut())
+                        .map(|(cl, cl_us)| {
+                            let mut clause_unsat = 1;
+                            for lit in &cl.lits {
+                                let var = lit.var();
+                                if lit.sign() != curr_model[var] {
+                                    clause_unsat = 0;
+                                    break;
+                                }
+                            }
+                            *cl_us = clause_unsat;
+                            clause_unsat
+                        })
+                        .sum()
+                };
 
                 if n_unsat_clauses == 0 {
                     return Solution::Sat(curr_model.iter().copied().collect());
@@ -182,55 +191,64 @@ impl Formula {
                 let mut scores = vec![0.0; self.num_vars as usize];
                 for x in cl {
                     let var_i = x.var();
-                    // let mut make_count = 0;
-                    // let mut break_count = 0;
 
                     curr_model[var_i] = !curr_model[var_i];
-                    let (break_count, make_count) = self
-                        .clauses
-                        .par_iter()
-                        .zip(clause_unsat.par_iter())
-                        .map(|(Clause { lits: cl }, cl_us)| {
-                            let mut cl_unsat = 1;
-                            for &lit in cl {
-                                let var = lit.var();
-                                if lit.sign() != curr_model[var] {
-                                    cl_unsat = 0;
-                                    break;
+                    let (break_count, make_count) = if parallel {
+                        self.clauses
+                            .par_iter()
+                            .zip(clause_unsat.par_iter())
+                            .map(|(Clause { lits: cl }, cl_us)| {
+                                let mut cl_unsat = 1;
+                                for &lit in cl {
+                                    let var = lit.var();
+                                    if lit.sign() != curr_model[var] {
+                                        cl_unsat = 0;
+                                        break;
+                                    }
                                 }
-                            }
 
-                            if cl_unsat != *cl_us {
-                                if cl_unsat == 1 {
-                                    // break_count += 1;
-                                    (1, 0)
+                                if cl_unsat != *cl_us {
+                                    if cl_unsat == 1 {
+                                        // break_count += 1;
+                                        (1, 0)
+                                    } else {
+                                        // make_count += 1;
+                                        (0, 1)
+                                    }
                                 } else {
-                                    // make_count += 1;
-                                    (0, 1)
+                                    (0, 0)
                                 }
-                            } else {
-                                (0, 0)
-                            }
-                        })
-                        .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
-                    // for (i, Clause { lits: cl }) in self.clauses.iter().enumerate() {
-                    //     let mut cl_unsat = 1;
-                    //     for &lit in cl {
-                    //         let var = lit.var();
-                    //         if lit.sign() != curr_model[var] {
-                    //             cl_unsat = 0;
-                    //             break;
-                    //         }
-                    //     }
+                            })
+                            .reduce(|| (0, 0), |a, b| (a.0 + b.0, a.1 + b.1))
+                    } else {
+                        self.clauses
+                            .iter()
+                            .zip(clause_unsat.iter())
+                            .map(|(Clause { lits: cl }, cl_us)| {
+                                let mut cl_unsat = 1;
+                                for &lit in cl {
+                                    let var = lit.var();
+                                    if lit.sign() != curr_model[var] {
+                                        cl_unsat = 0;
+                                        break;
+                                    }
+                                }
 
-                    //     if cl_unsat != clause_unsat[i] {
-                    //         if cl_unsat == 1 {
-                    //             break_count += 1;
-                    //         } else {
-                    //             make_count += 1;
-                    //         }
-                    //     }
-                    // }
+                                if cl_unsat != *cl_us {
+                                    if cl_unsat == 1 {
+                                        // break_count += 1;
+                                        (1, 0)
+                                    } else {
+                                        // make_count += 1;
+                                        (0, 1)
+                                    }
+                                } else {
+                                    (0, 0)
+                                }
+                            })
+                            .fold((0, 0), |a, b| (a.0 + b.0, a.1 + b.1))
+                    };
+
                     curr_model[var_i] = !curr_model[var_i];
 
                     scores[var_i] = match score_fn_type {

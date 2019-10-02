@@ -5,26 +5,20 @@ use structopt::StructOpt;
 #[structopt(name="rsat", about=env!("CARGO_PKG_DESCRIPTION"), version=env!("CARGO_PKG_VERSION"),
 setting=structopt::clap::AppSettings::ColoredHelp)]
 struct Opt {
-    #[structopt(parse(from_os_str), help = "Input file in DIMACS format")]
+    /// Input file in DIMACS format
+    #[structopt(parse(from_os_str))]
     file: PathBuf,
-    #[structopt(
-        short,
-        long,
-        default_value = "1",
-        help = "Algorithm to use (1 -> CDCL, 2 -> SLS)"
-    )]
+    /// Algorithm to use (1 -> CDCL, 2 -> SLS)
+    #[structopt(short, long, default_value = "1")]
     alg: u32,
-    #[structopt(
-        long = "max-tries",
-        default_value = "100",
-        help = "Maximum number of tries for SLS"
-    )]
+    /// Enables data parallelism (currently only for sls solver)
+    #[structopt(short, long)]
+    parallel: bool,
+    /// Maximum number of tries for SLS
+    #[structopt(long = "max-tries", default_value = "100")]
     max_tries: u32,
-    #[structopt(
-        long = "max-flips",
-        default_value = "1000",
-        help = "Maxinum number of flips in each try of SLS"
-    )]
+    /// Maxinum number of flips in each try of SLS
+    #[structopt(long = "max-flips", default_value = "1000")]
     max_flips: u32,
 }
 
@@ -49,7 +43,12 @@ fn main() {
             }
             solver.solve(vec![])
         }
-        2 => formula.local_search(opt.max_tries, opt.max_flips, rsat::sls::ScoreFnType::Exp),
+        2 => formula.local_search(
+            opt.max_tries,
+            opt.max_flips,
+            rsat::sls::ScoreFnType::Exp,
+            opt.parallel,
+        ),
         _ => panic!("Invalid algorithm"),
     };
     match solution {

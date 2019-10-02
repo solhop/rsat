@@ -85,7 +85,7 @@ pub struct Clause {
 /// Solution to the SAT Formula.
 #[derive(Debug)]
 pub enum Solution {
-    /// The formula is unsatisfiable
+    /// The formula is unsatisfiable.
     Unsat,
     /// Neither SAT or UNSAT was proven. Best model known so far.
     Best(Vec<bool>),
