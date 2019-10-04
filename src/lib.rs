@@ -1,6 +1,6 @@
 //! `rsat` is a SAT and MaxSAT Solver.
 //!
-//! ## An example
+//! ## An example using the SLS solver
 //!
 //! ```rust
 //! fn main() {
