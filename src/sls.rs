@@ -12,12 +12,13 @@ const C_MAKE: f32 = 0.5;
 const C_BREAK: f32 = 3.7;
 
 /// Scoring function type.
-#[derive(Clone, Copy)]
 pub enum ScoreFnType {
     /// Use polynomial scoring function.
     Poly,
     /// Use exponential scoring function.
     Exp,
+    /// Cutom scoring function.
+    Custom(Box<dyn Fn(i32, i32) -> f32>),
 }
 
 /// A SAT Formula.
@@ -251,9 +252,10 @@ impl Formula {
 
                     curr_model[var_i] = !curr_model[var_i];
 
-                    scores[var_i] = match score_fn_type {
+                    scores[var_i] = match &score_fn_type {
                         ScoreFnType::Poly => 1.0 / (1.0 + break_count as f32).powf(C_BREAK),
                         ScoreFnType::Exp => C_MAKE.powi(make_count) / C_BREAK.powi(break_count),
+                        ScoreFnType::Custom(f) => f(make_count, break_count),
                     };
                 }
 
