@@ -9,14 +9,46 @@ enum ClauseIndex {
     Lrnt(usize),
 }
 
-/// Represents a CDCL solver.
-#[derive(Default)]
-pub struct Solver {
-    clauses: Vec<Clause>,
+struct SolverOptions {
     cla_inc: f64,
     cla_decay: f64,
     var_inc: f64,
     var_decay: f64,
+}
+
+/// Different Solver Options.
+pub enum SolverOption {
+    /// The clause activity decay factor.
+    ClaDecay(f64),
+    /// The variable activity decay factor.
+    VarDecay(f64),
+}
+
+impl Default for SolverOptions {
+    fn default() -> Self {
+        SolverOptions {
+            cla_inc: 1.0,
+            cla_decay: 0.999,
+            var_inc: 1.0,
+            var_decay: 0.95,
+        }
+    }
+}
+
+impl SolverOptions {
+    fn option(&mut self, option: SolverOption) {
+        match option {
+            SolverOption::ClaDecay(v) => self.cla_decay = v,
+            SolverOption::VarDecay(v) => self.var_decay = v,
+        }
+    }
+}
+
+/// Represents a CDCL solver.
+#[derive(Default)]
+pub struct Solver {
+    clauses: Vec<Clause>,
+    options: SolverOptions,
     activity: Vec<f64>,
     learnts: HashMap<usize, (Clause, f64)>,
     curr_learnt_id: usize,
@@ -34,10 +66,12 @@ pub struct Solver {
 impl Solver {
     /// Create a new CDCL solver.
     pub fn new() -> Self {
-        let mut solver = Solver::default();
-        solver.var_inc = 1.0;
-        solver.cla_inc = 1.0;
-        solver
+        Solver::default()
+    }
+
+    /// Configure solver option.
+    pub fn option(&mut self, option: SolverOption) {
+        self.options.option(option);
     }
 
     /// Returns the number of variables in the formula.
@@ -332,7 +366,7 @@ impl Solver {
     }
 
     fn var_bump_activity(&mut self, x: Var) {
-        self.activity[x] += self.var_inc;
+        self.activity[x] += self.options.var_inc;
         if self.activity[x] > 1e100 {
             self.var_rescale_activity();
         }
@@ -340,20 +374,20 @@ impl Solver {
     }
 
     fn var_decay_activity(&mut self) {
-        self.var_inc *= self.var_decay;
+        self.options.var_inc *= self.options.var_decay;
     }
 
     fn var_rescale_activity(&mut self) {
         for i in 0..self.activity.len() {
             self.activity[i] *= 1e-100;
         }
-        self.var_inc *= 1e-100;
+        self.options.var_inc *= 1e-100;
     }
 
     fn cla_bump_activity(&mut self, ci: ClauseIndex) {
         if let ClauseIndex::Lrnt(index) = ci {
             let cl = self.learnts.get_mut(&index).unwrap();
-            cl.1 += self.cla_inc;
+            cl.1 += self.options.cla_inc;
             if cl.1 > 1e100 {
                 self.cla_rescale_activity();
             }
@@ -361,14 +395,14 @@ impl Solver {
     }
 
     fn cla_decay_activity(&mut self) {
-        self.cla_inc *= self.cla_decay;
+        self.options.cla_inc *= self.options.cla_decay;
     }
 
     fn cla_rescale_activity(&mut self) {
         for (_, cl) in self.learnts.iter_mut() {
             cl.1 *= 1e-100;
         }
-        self.cla_inc *= 1e-100;
+        self.options.cla_inc *= 1e-100;
     }
 
     fn decay_activities(&mut self) {
@@ -507,8 +541,8 @@ impl Solver {
         params: (f64, f64),
     ) -> (LBool, Vec<bool>) {
         let mut conflit_c = 0;
-        self.var_decay = 1.0 / params.0;
-        self.cla_decay = 1.0 / params.1;
+        self.options.var_decay = 1.0 / params.0;
+        self.options.cla_decay = 1.0 / params.1;
 
         loop {
             let confl = self.propagate();
@@ -566,7 +600,7 @@ impl Solver {
 
     fn reduce_db(&mut self) {
         let mut i = 0;
-        let lim = self.cla_inc / self.learnts.len() as f64;
+        let lim = self.options.cla_inc / self.learnts.len() as f64;
 
         let mut acts: Vec<_> = self.learnts.iter().map(|(&i, &(_, a))| (i, a)).collect();
         acts.sort_unstable_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap());
@@ -607,7 +641,7 @@ impl Solver {
     pub fn solve(&mut self, assumps: Vec<Lit>) -> Solution {
         let params = (0.95, 0.999);
         let restart_first = 100.0;
-        let restart_inc = 2.0;
+        let restart_inc = 2.0f64;
         let mut nof_learnts: f64 = (self.n_clauses() as f64) / 3.0;
         let mut status = LBool::Undef;
 
@@ -624,13 +658,8 @@ impl Solver {
 
         // Solve
         let mut curr_restarts = 0;
-        let use_luby = false;
         while status == LBool::Undef {
-            let rest_base = if use_luby {
-                luby(restart_inc, curr_restarts)
-            } else {
-                restart_inc.powi(curr_restarts)
-            };
+            let rest_base = restart_inc.powi(curr_restarts);
             let nof_conflicts = rest_base * restart_first;
             let res = self.search(nof_conflicts as u32, nof_learnts as u32, params);
             status = res.0;
@@ -647,21 +676,4 @@ impl Solver {
             Solution::Unsat
         }
     }
-}
-
-fn luby(y: f64, mut x: i32) -> f64 {
-    let mut size = 1;
-    let mut seq = 0;
-    while size < x + 1 {
-        seq += 1;
-        size = 2 * size + 1;
-    }
-
-    while size - 1 != x {
-        size = (size - 1) >> 1;
-        seq -= 1;
-        x %= size;
-    }
-
-    y.powi(seq)
 }
