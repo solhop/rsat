@@ -13,6 +13,8 @@ const C_BREAK: f32 = 3.7;
 
 /// Scoring function type.
 pub enum ScoreFnType {
+    /// Choose flip variable randomly.
+    Rand,
     /// Use polynomial scoring function.
     Poly,
     /// Use exponential scoring function.
@@ -253,6 +255,7 @@ impl Formula {
                     curr_model[var_i] = !curr_model[var_i];
 
                     scores[var_i] = match &score_fn_type {
+                        ScoreFnType::Rand => 1.0,
                         ScoreFnType::Poly => 1.0 / (1.0 + break_count as f32).powf(C_BREAK),
                         ScoreFnType::Exp => C_MAKE.powi(make_count) / C_BREAK.powi(break_count),
                         ScoreFnType::Custom(f) => f(make_count, break_count),
