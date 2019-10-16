@@ -29,6 +29,9 @@ fn main() {
     use rsat::common::Solution::*;
     let solution = match opt.alg {
         1 => {
+            if opt.parallel {
+                panic!("Parallelism is not implemented for CDCL solver yet.");
+            }
             let mut solver = rsat::msat::Solver::new();
             for _ in 0..formula.n_vars() {
                 solver.new_var();
