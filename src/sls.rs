@@ -1,3 +1,4 @@
+use crate::common::errors::*;
 use crate::common::*;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
@@ -31,19 +32,19 @@ pub struct Formula {
 
 impl Formula {
     /// Read formula in DIMACS format from STDIN.
-    pub fn new_from_stdin() -> Self {
+    pub fn new_from_stdin() -> Result<Self> {
         Formula::new_from_buf_reader(&mut std::io::stdin().lock())
     }
 
     /// Read formula in DIMACS format from a file.
-    pub fn new_from_file(filename: &str) -> Self {
+    pub fn new_from_file(filename: &str) -> Result<Self> {
         let file = File::open(filename).expect("File not found");
         let mut reader = io::BufReader::new(file);
         Formula::new_from_buf_reader(&mut reader)
     }
 
     /// Read formula in DIMACS format from buffer reader.
-    pub fn new_from_buf_reader<F>(reader: &mut F) -> Self
+    pub fn new_from_buf_reader<F>(reader: &mut F) -> Result<Self>
     where
         F: std::io::BufRead,
     {
@@ -65,24 +66,17 @@ impl Formula {
                 let re = Regex::new(r"p\s+cnf\s+(\d+)\s+(\d+)").unwrap();
                 let cap = re.captures(&line);
                 if let Some(cap) = cap {
-                    let n_vars = match cap[1].parse() {
-                        Ok(n) => n,
-                        _ => panic!("Input file could not be parsed"),
-                    };
-                    n_clauses = match cap[2].parse() {
-                        Ok(n) => n,
-                        _ => panic!("Input file could not be parsed"),
-                    };
+                    let n_vars = cap[1].parse()?;
+                    n_clauses = cap[2].parse()?;
                     f.num_vars = n_vars;
                 }
             } else {
                 let re = Regex::new(r"(-?\d+)").unwrap();
                 let mut cl = vec![];
                 for cap in re.captures_iter(&line) {
-                    let l = match cap[1].parse::<i32>() {
-                        Ok(0) => continue,
-                        Ok(n) => n,
-                        _ => panic!("Invalid character"),
+                    let l = match cap[1].parse::<i32>()? {
+                        0 => continue,
+                        n => n,
                     };
                     let sign = if l < 0 { 1 } else { 0 };
                     let var = (l.abs() - 1) as usize;
@@ -96,7 +90,7 @@ impl Formula {
             }
         }
 
-        f
+        Ok(f)
     }
 
     /// Returns the number of variables in the formula.

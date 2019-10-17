@@ -92,3 +92,13 @@ pub enum Solution {
     /// The formula is satisfiable. A satifying model for the formula.
     Sat(Vec<bool>),
 }
+
+/// Errors module.
+#[allow(missing_docs)]
+pub mod errors {
+    error_chain::error_chain! {
+        foreign_links {
+            ParseIntError(std::num::ParseIntError);
+        }
+    }
+}
