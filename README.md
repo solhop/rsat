@@ -7,7 +7,7 @@ SolHop SAT and MaxSAT Solver.
 ![Crates.io](https://img.shields.io/crates/l/rsat)
 [![Docs](https://docs.rs/rsat/badge.svg)](https://docs.rs/rsat)
 [![Build Status](https://dev.azure.com/solhop/rsat/_apis/build/status/solhop.rsat?branchName=master)](https://dev.azure.com/solhop/rsat/_build/latest?definitionId=1&branchName=master)
-[![Coverage Status](https://coveralls.io/repos/github/solhop/rsat/badge.svg?branch=master)](https://coveralls.io/github/solhop/rsat?branch=master)
+<!-- [![Coverage Status](https://coveralls.io/repos/github/solhop/rsat/badge.svg?branch=master)](https://coveralls.io/github/solhop/rsat?branch=master) -->
 
 Currently, a stochastic local search based on probSAT and a CDCL solver based on MiniSAT has been implemented.
 More algorithms will be available soon.
