@@ -24,7 +24,7 @@ struct Opt {
 
 fn main() {
     let opt = Opt::from_args();
-    let mut formula = rsat::sls::Formula::new_from_file(opt.file.to_str().unwrap()).unwrap();
+    let mut formula = rsat::sls::Solver::new_from_file(opt.file.to_str().unwrap()).unwrap();
 
     use rsat::Solution::*;
     let solution = match opt.alg {

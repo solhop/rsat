@@ -22,23 +22,23 @@ pub enum ScoreFnType {
     Custom(Box<dyn Fn(i32, i32) -> f32>),
 }
 
-/// A SAT Formula.
-pub struct Formula {
+/// SLS Solver.
+pub struct Solver {
     num_vars: usize,
     clauses: Vec<Clause>,
 }
 
-impl Formula {
+impl Solver {
     /// Read formula in DIMACS format from STDIN.
     pub fn new_from_stdin() -> Result<Self> {
-        Formula::new_from_buf_reader(&mut std::io::stdin().lock())
+        Solver::new_from_buf_reader(&mut std::io::stdin().lock())
     }
 
     /// Read formula in DIMACS format from a file.
     pub fn new_from_file(filename: &str) -> Result<Self> {
         let file = File::open(filename).expect("File not found");
         let mut reader = io::BufReader::new(file);
-        Formula::new_from_buf_reader(&mut reader)
+        Solver::new_from_buf_reader(&mut reader)
     }
 
     /// Read formula in DIMACS format from buffer reader.
@@ -50,7 +50,7 @@ impl Formula {
         match parsed {
             Ok(parsed) => {
                 if let crate::parser::Dimacs::Cnf { n_vars, clauses } = parsed {
-                    Ok(Formula {
+                    Ok(Solver {
                         num_vars: n_vars,
                         clauses,
                     })
@@ -100,7 +100,7 @@ impl Formula {
         let mut rng = thread_rng();
 
         for _ in 0..max_tries {
-            Formula::gen_rand_model(
+            Solver::gen_rand_model(
                 &mut curr_model,
                 &mut rng,
                 &vec![LBool::Undef; self.num_vars],

@@ -27,15 +27,16 @@ cargo install rsat
 
 ```sh
 $ rsat --help
-rsat 0.1.4
+rsat 0.1.5
 SolHOP SAT and MaxSAT Solver
 
 USAGE:
-    rsat [OPTIONS] <file>
+    rsat [FLAGS] [OPTIONS] <file>
 
 FLAGS:
-    -h, --help       Prints help information
-    -V, --version    Prints version information
+    -h, --help        Prints help information
+    -p, --parallel    Enables data parallelism (currently only for sls solver)
+    -V, --version     Prints version information
 
 OPTIONS:
     -a, --alg <alg>                Algorithm to use (1 -> CDCL, 2 -> SLS) [default: 1]
