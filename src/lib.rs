@@ -20,7 +20,12 @@
 #![deny(missing_docs)]
 
 /// Common utils.
-pub mod common;
+mod common;
+
+pub use common::*;
+
+/// DIMACS Parser.
+pub mod parser;
 
 /// sls, a local search solver module.
 pub mod sls;

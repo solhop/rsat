@@ -1,12 +1,10 @@
-use crate::common::errors::*;
-use crate::common::*;
+use crate::errors::*;
+use crate::*;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rayon::prelude::*;
-use regex::Regex;
 use std::fs::File;
 use std::io;
-use std::io::BufRead;
 
 /// Magic numbers used by local search.
 const C_MAKE: f32 = 0.5;
@@ -48,49 +46,20 @@ impl Formula {
     where
         F: std::io::BufRead,
     {
-        let mut n_clauses = 0usize;
-        let mut f = Formula {
-            num_vars: 0,
-            clauses: vec![],
-        };
-
-        for line in reader.lines() {
-            let line = line.unwrap();
-            let line = line.trim();
-            if line.is_empty() {
-                continue;
-            }
-            if line.starts_with('c') {
-                continue;
-            } else if line.starts_with('p') {
-                let re = Regex::new(r"p\s+cnf\s+(\d+)\s+(\d+)").unwrap();
-                let cap = re.captures(&line);
-                if let Some(cap) = cap {
-                    let n_vars = cap[1].parse()?;
-                    n_clauses = cap[2].parse()?;
-                    f.num_vars = n_vars;
-                }
-            } else {
-                let re = Regex::new(r"(-?\d+)").unwrap();
-                let mut cl = vec![];
-                for cap in re.captures_iter(&line) {
-                    let l = match cap[1].parse::<i32>()? {
-                        0 => continue,
-                        n => n,
-                    };
-                    let sign = if l < 0 { 1 } else { 0 };
-                    let var = (l.abs() - 1) as usize;
-                    let l = 2 * var + sign;
-                    cl.push(Lit(l));
-                }
-                f.add_clause(cl);
-                if f.clauses.len() == n_clauses {
-                    break;
+        let parsed = crate::parser::parse_dimacs_from_buf_reader(reader);
+        match parsed {
+            Ok(parsed) => {
+                if let crate::parser::Dimacs::Cnf { n_vars, clauses } = parsed {
+                    Ok(Formula {
+                        num_vars: n_vars,
+                        clauses,
+                    })
+                } else {
+                    panic!("Incorrect input format");
                 }
             }
+            Err(e) => Err(e),
         }
-
-        Ok(f)
     }
 
     /// Returns the number of variables in the formula.

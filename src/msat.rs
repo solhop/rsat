@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
-use crate::common::{Clause, LBool, Lit, Solution, Var};
+use crate::{Clause, LBool, Lit, Solution, Var};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum ClauseIndex {

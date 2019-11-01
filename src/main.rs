@@ -26,7 +26,7 @@ fn main() {
     let opt = Opt::from_args();
     let mut formula = rsat::sls::Formula::new_from_file(opt.file.to_str().unwrap()).unwrap();
 
-    use rsat::common::Solution::*;
+    use rsat::Solution::*;
     let solution = match opt.alg {
         1 => {
             if opt.parallel {
@@ -56,6 +56,7 @@ fn main() {
     };
     match solution {
         Unsat => println!("UNSAT"),
+        Unknown => println!("UNKNOWN"),
         Best(solution) => {
             println!("UNKNOWN");
             let solution = solution.iter().map(|&x| if x { 1 } else { -1 });

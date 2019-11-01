@@ -91,6 +91,8 @@ pub enum Solution {
     Best(Vec<bool>),
     /// The formula is satisfiable. A satifying model for the formula.
     Sat(Vec<bool>),
+    /// No solution could be found.
+    Unknown,
 }
 
 /// Errors module.
