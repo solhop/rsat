@@ -27,7 +27,7 @@ cargo install rsat
 
 ```sh
 $ rsat --help
-rsat 0.1.5
+rsat 0.1.6
 SolHOP SAT and MaxSAT Solver
 
 USAGE:
