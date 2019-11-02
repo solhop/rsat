@@ -32,7 +32,8 @@ fn main() {
             if opt.parallel {
                 panic!("Parallelism is not implemented for CDCL solver yet.");
             }
-            let mut solver = rsat::msat::Solver::new();
+            use rsat::msat::*;
+            let mut solver = Solver::new(SolverOptions::default());
             for _ in 0..formula.n_vars() {
                 solver.new_var();
             }

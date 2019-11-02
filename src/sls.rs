@@ -249,6 +249,7 @@ impl Solver {
 
     /// Verify that the clauses are satisfied by the input model.
     pub fn verify(&self, model: &[bool]) -> bool {
+        // println!("c Verifying solution");
         for Clause { lits: cl } in self.clauses.iter() {
             let mut cla_sat = false;
             for &lit in cl.iter() {

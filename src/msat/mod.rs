@@ -1,15 +1,13 @@
-use std::collections::HashMap;
+mod clause_db;
+mod var_manager;
+
+use crate::*;
+use clause_db::{ClauseDb, ClauseIndex};
 use std::collections::VecDeque;
+use var_manager::VarManager;
 
-use crate::{Clause, LBool, Lit, Solution, Var};
-
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum ClauseIndex {
-    Orig(usize),
-    Lrnt(usize),
-}
-
-struct SolverOptions {
+/// Solver options.
+pub struct SolverOptions {
     cla_inc: f64,
     cla_decay: f64,
     var_inc: f64,
@@ -36,7 +34,8 @@ impl Default for SolverOptions {
 }
 
 impl SolverOptions {
-    fn option(&mut self, option: SolverOption) {
+    /// Add solver option.
+    pub fn option(&mut self, option: SolverOption) {
         match option {
             SolverOption::ClaDecay(v) => self.cla_decay = v,
             SolverOption::VarDecay(v) => self.var_decay = v,
@@ -44,25 +43,8 @@ impl SolverOptions {
     }
 }
 
-#[derive(Default)]
-struct ClauseDb {
-    original: Vec<Clause>,
-    learnts: HashMap<usize, (Clause, f64)>,
-    curr_learnt_id: usize,
-}
-
-#[derive(Default)]
-struct VarManager {
-    assigns: Vec<LBool>,
-    activity: Vec<f64>,
-    reason: Vec<Option<ClauseIndex>>,
-    level: Vec<i32>,
-}
-
 /// Represents a CDCL solver.
-#[derive(Default)]
 pub struct Solver {
-    options: SolverOptions,
     clause_db: ClauseDb,
     var_manager: VarManager,
     watches: Vec<Vec<ClauseIndex>>,
@@ -74,18 +56,21 @@ pub struct Solver {
 
 impl Solver {
     /// Create a new CDCL solver.
-    pub fn new() -> Self {
-        Solver::default()
-    }
-
-    /// Configure solver option.
-    pub fn option(&mut self, option: SolverOption) {
-        self.options.option(option);
+    pub fn new(options: SolverOptions) -> Self {
+        Solver {
+            clause_db: ClauseDb::new(options.cla_inc, options.cla_decay),
+            var_manager: VarManager::new(options.var_inc, options.var_decay),
+            watches: vec![],
+            prop_q: VecDeque::new(),
+            trail: vec![],
+            trail_lim: vec![],
+            root_level: 0,
+        }
     }
 
     /// Returns the number of variables in the formula.
     pub fn n_vars(&self) -> usize {
-        self.var_manager.assigns.len()
+        self.var_manager.n_vars()
     }
 
     /// Returns the number of assigned variables in the formula.
@@ -95,30 +80,22 @@ impl Solver {
 
     /// Returns the number of original clauses in the formula.
     pub fn n_clauses(&self) -> usize {
-        self.clause_db.original.len()
+        self.clause_db.original_len()
     }
 
     /// Returns the number of learnt clauses in the formula.
     pub fn n_learnts(&self) -> usize {
-        self.clause_db.learnts.len()
+        self.clause_db.learnts_len()
     }
 
     /// Returns the assignment of the variable.
     pub fn value(&self, x: Var) -> LBool {
-        self.var_manager.assigns[x]
+        self.var_manager.value(x)
     }
 
     /// Returns the value of the literal under current partial assignment.
     pub fn value_lit(&self, p: Lit) -> LBool {
-        Self::value_lit_from_assigns(&self.var_manager.assigns, p)
-    }
-
-    fn value_lit_from_assigns(assigns: &[LBool], p: Lit) -> LBool {
-        if p.sign() {
-            !assigns[p.var()]
-        } else {
-            assigns[p.var()]
-        }
+        self.var_manager.value_lit(p)
     }
 
     /// Returns the current decision level in the solver.
@@ -128,14 +105,9 @@ impl Solver {
 
     /// Add a new variable to the solver.
     pub fn new_var(&mut self) -> Var {
-        let v = self.n_vars();
         self.watches.push(vec![]);
         self.watches.push(vec![]);
-        self.var_manager.reason.push(None);
-        self.var_manager.assigns.push(LBool::Undef);
-        self.var_manager.level.push(-1);
-        self.var_manager.activity.push(0.0);
-        v
+        self.var_manager.new_var()
     }
 
     /// Add a new clause to the solver.
@@ -144,40 +116,31 @@ impl Solver {
         r
     }
 
-    fn varorder_select(&mut self) -> Var {
-        let mut max_i = 0;
-        for i in 0..self.var_manager.activity.len() {
-            if self.value(i) == LBool::Undef
-                && (self.value(max_i) != LBool::Undef
-                    || self.var_manager.activity[i] > self.var_manager.activity[max_i])
-            {
-                max_i = i;
-            }
-        }
-        max_i
+    fn varorder_select(&self) -> Var {
+        self.var_manager.select_var()
     }
 
     fn clause_locked(&self, ci: ClauseIndex) -> bool {
-        let cl = self.get_clause_ref(ci);
-        self.var_manager.reason[cl.lits[0].var()] == Some(ci)
+        let cl = self.clause_db.get_clause_ref(ci);
+        self.var_manager.get_reason(cl.lits[0].var()) == Some(ci)
     }
 
     fn clause_remove_learnt(&mut self, ci: ClauseIndex) {
         if let ClauseIndex::Lrnt(index) = ci {
-            let learnt = self.clause_db.learnts.get(&index).unwrap();
-            if let Some(i) = self.watches[(!learnt.0.lits[0]).index()]
+            let learnt = self.clause_db.get_learnt(index).unwrap();
+            if let Some(i) = self.watches[(!learnt.lits[0]).index()]
                 .iter()
                 .position(|&s| s == ci)
             {
-                self.watches[(!learnt.0.lits[0]).index()].remove(i);
+                self.watches[(!learnt.lits[0]).index()].remove(i);
             }
-            if let Some(i) = self.watches[(!learnt.0.lits[1]).index()]
+            if let Some(i) = self.watches[(!learnt.lits[1]).index()]
                 .iter()
                 .position(|&s| s == ci)
             {
-                self.watches[(!learnt.0.lits[1]).index()].remove(i);
+                self.watches[(!learnt.lits[1]).index()].remove(i);
             }
-            self.clause_db.learnts.remove(&index);
+            self.clause_db.remove_learnt(index);
         }
     }
 
@@ -185,65 +148,61 @@ impl Solver {
         let enqueue_lit = match ci {
             ClauseIndex::Orig(index) => {
                 // Make sure false lit at cl.lits[1]
-                if self.clause_db.original[index].lits[0] == !p {
-                    self.clause_db.original[index].lits[0] = self.clause_db.original[index].lits[1];
-                    self.clause_db.original[index].lits[1] = !p;
+                let clause = self.clause_db.get_original_mut(index).unwrap();
+                if clause.lits[0] == !p {
+                    clause.lits[0] = clause.lits[1];
+                    clause.lits[1] = !p;
                 }
 
                 // If 0th watch is true, clause is already satisfied
-                if self.value_lit(self.clause_db.original[index].lits[0]) == LBool::True {
+                if self.var_manager.value_lit(clause.lits[0]) == LBool::True {
                     // Re insert clause into watcher list
                     self.watches[p.index()].push(ci);
                     return true;
                 }
 
                 // Look for a new literal to watch
-                for i in 2..self.clause_db.original[index].lits.len() {
-                    if self.value_lit(self.clause_db.original[index].lits[i]) != LBool::False {
-                        self.clause_db.original[index].lits[1] =
-                            self.clause_db.original[index].lits[i];
-                        self.clause_db.original[index].lits[i] = !p;
-                        self.watches[(!self.clause_db.original[index].lits[1]).index()].push(ci);
+                for i in 2..clause.lits.len() {
+                    if self.var_manager.value_lit(clause.lits[i]) != LBool::False {
+                        clause.lits[1] = clause.lits[i];
+                        clause.lits[i] = !p;
+                        self.watches[(!clause.lits[1]).index()].push(ci);
                         return true;
                     }
                 }
 
                 // Clause is unit under assignment
                 self.watches[p.index()].push(ci);
-                self.clause_db.original[index].lits[0]
+                clause.lits[0]
             }
             ClauseIndex::Lrnt(index) => {
                 // Make sure false lit at cl.lits[1]
-                let learnt = self.clause_db.learnts.get_mut(&index).unwrap();
-                if learnt.0.lits[0] == !p {
-                    learnt.0.lits[0] = learnt.0.lits[1];
-                    learnt.0.lits[1] = !p;
+                let learnt = self.clause_db.get_learnt_mut(index).unwrap();
+                if learnt.lits[0] == !p {
+                    learnt.lits[0] = learnt.lits[1];
+                    learnt.lits[1] = !p;
                 }
 
                 // If 0th watch is true, clause is already satisfied
-                if Self::value_lit_from_assigns(&self.var_manager.assigns, learnt.0.lits[0])
-                    == LBool::True
-                {
+                if self.var_manager.value_lit(learnt.lits[0]) == LBool::True {
                     // Re insert clause into watcher list
                     self.watches[p.index()].push(ci);
                     return true;
                 }
 
                 // Look for a new literal to watch
-                for i in 2..learnt.0.lits.len() {
-                    if Self::value_lit_from_assigns(&self.var_manager.assigns, learnt.0.lits[i])
-                        != LBool::False
-                    {
-                        learnt.0.lits[1] = learnt.0.lits[i];
-                        learnt.0.lits[i] = !p;
-                        self.watches[(!learnt.0.lits[1]).index()].push(ci);
+                for i in 2..learnt.lits.len() {
+                    if self.var_manager.value_lit(learnt.lits[i]) != LBool::False {
+                        learnt.lits[1] = learnt.lits[i];
+                        learnt.lits[i] = !p;
+                        self.watches[(!learnt.lits[1]).index()].push(ci);
                         return true;
                     }
                 }
 
                 // Clause is unit under assignment
                 self.watches[p.index()].push(ci);
-                learnt.0.lits[0]
+                learnt.lits[0]
             }
         };
         self.enqueue(enqueue_lit, Some(ci))
@@ -252,7 +211,7 @@ impl Solver {
     // Only called at top level with empty prop queue
     fn clause_simplify(&mut self, ci: ClauseIndex) -> bool {
         let mut j = 0;
-        let cl = self.get_clause_ref(ci);
+        let cl = self.clause_db.get_clause_ref(ci);
         let mut lits = cl.lits.clone();
         for i in 0..lits.len() {
             if self.value_lit(lits[i]) == LBool::True {
@@ -265,13 +224,13 @@ impl Solver {
         while lits.len() != j {
             lits.pop();
         }
-        self.get_clause_mut_ref(ci).lits = lits;
+        self.clause_db.get_clause_mut_ref(ci).lits = lits;
         false
     }
 
     fn clause_calc_reason(&mut self, ci: ClauseIndex, p: Option<Lit>) -> Vec<Lit> {
         // Inv: p == None or p == cl.Lits[0]
-        let cl = self.get_clause_ref(ci);
+        let cl = self.clause_db.get_clause_ref(ci);
         debug_assert!(p == None || p == Some(cl.lits[0]));
         let mut reason = vec![];
         for i in (if p == None { 0 } else { 1 })..cl.lits.len() {
@@ -279,22 +238,8 @@ impl Solver {
             debug_assert!(self.value_lit(cl.lits[i]) == LBool::False);
             reason.push(!cl.lits[i]);
         }
-        self.cla_bump_activity(ci);
+        self.clause_db.cla_bump_activity(ci);
         reason
-    }
-
-    fn get_clause_ref(&self, ci: ClauseIndex) -> &Clause {
-        match ci {
-            ClauseIndex::Orig(ci) => &self.clause_db.original[ci],
-            ClauseIndex::Lrnt(ci) => &self.clause_db.learnts.get(&ci).unwrap().0,
-        }
-    }
-
-    fn get_clause_mut_ref(&mut self, ci: ClauseIndex) -> &mut Clause {
-        match ci {
-            ClauseIndex::Orig(ci) => &mut self.clause_db.original[ci],
-            ClauseIndex::Lrnt(ci) => &mut self.clause_db.learnts.get_mut(&ci).unwrap().0,
-        }
     }
 
     fn clause_new(&mut self, mut ps: Vec<Lit>, learnt: bool) -> (bool, Option<ClauseIndex>) {
@@ -334,7 +279,8 @@ impl Solver {
                 // Index of the lit with highest decision level
                 let mut max_i = 0;
                 for i in 0..ps.len() {
-                    if self.var_manager.level[ps[i].var()] > self.var_manager.level[ps[max_i].var()]
+                    if self.var_manager.get_level(ps[i].var())
+                        > self.var_manager.get_level(ps[max_i].var())
                     {
                         max_i = i;
                     }
@@ -345,23 +291,22 @@ impl Solver {
             }
 
             let ci = if !learnt {
-                let ci = ClauseIndex::Orig(self.clause_db.original.len());
-                self.watches[(!ps[0]).index()].push(ci);
-                self.watches[(!ps[1]).index()].push(ci);
-                self.clause_db.original.push(Clause { lits: ps });
+                let ps_0 = ps[0];
+                let ps_1 = ps[1];
+                let ci = self.clause_db.add_original(Clause { lits: ps });
+                self.watches[(!ps_0).index()].push(ci);
+                self.watches[(!ps_1).index()].push(ci);
                 ci
             } else {
-                let ci = ClauseIndex::Lrnt(self.clause_db.curr_learnt_id);
-                self.watches[(!ps[0]).index()].push(ci);
-                self.watches[(!ps[1]).index()].push(ci);
                 for p in &ps {
-                    self.var_bump_activity(p.var());
+                    self.var_manager.var_bump_activity(p.var());
                 }
-                self.clause_db
-                    .learnts
-                    .insert(self.clause_db.curr_learnt_id, (Clause { lits: ps }, 0.0));
-                self.clause_db.curr_learnt_id += 1;
-                self.cla_bump_activity(ci);
+                let ps_0 = ps[0];
+                let ps_1 = ps[1];
+                let ci = self.clause_db.add_learnt(Clause { lits: ps });;
+                self.watches[(!ps_0).index()].push(ci);
+                self.watches[(!ps_1).index()].push(ci);
+                self.clause_db.cla_bump_activity(ci);
                 ci
             };
 
@@ -369,48 +314,9 @@ impl Solver {
         }
     }
 
-    fn var_bump_activity(&mut self, x: Var) {
-        self.var_manager.activity[x] += self.options.var_inc;
-        if self.var_manager.activity[x] > 1e100 {
-            self.var_rescale_activity();
-        }
-    }
-
-    fn var_decay_activity(&mut self) {
-        self.options.var_inc *= self.options.var_decay;
-    }
-
-    fn var_rescale_activity(&mut self) {
-        for i in 0..self.var_manager.activity.len() {
-            self.var_manager.activity[i] *= 1e-100;
-        }
-        self.options.var_inc *= 1e-100;
-    }
-
-    fn cla_bump_activity(&mut self, ci: ClauseIndex) {
-        if let ClauseIndex::Lrnt(index) = ci {
-            let cl = self.clause_db.learnts.get_mut(&index).unwrap();
-            cl.1 += self.options.cla_inc;
-            if cl.1 > 1e100 {
-                self.cla_rescale_activity();
-            }
-        }
-    }
-
-    fn cla_decay_activity(&mut self) {
-        self.options.cla_inc *= self.options.cla_decay;
-    }
-
-    fn cla_rescale_activity(&mut self) {
-        for (_, cl) in self.clause_db.learnts.iter_mut() {
-            cl.1 *= 1e-100;
-        }
-        self.options.cla_inc *= 1e-100;
-    }
-
     fn decay_activities(&mut self) {
-        self.var_decay_activity();
-        self.cla_decay_activity();
+        self.var_manager.var_decay_activity();
+        self.clause_db.cla_decay_activity();
     }
 
     fn propagate(&mut self) -> Option<ClauseIndex> {
@@ -437,9 +343,11 @@ impl Solver {
         if self.value_lit(p) != LBool::Undef {
             !(self.value_lit(p) == LBool::False)
         } else {
-            self.var_manager.assigns[p.var()] = LBool::from(!p.sign());
-            self.var_manager.level[p.var()] = self.decision_level();
-            self.var_manager.reason[p.var()] = from;
+            self.var_manager
+                .update_assign(p.var(), LBool::from(!p.sign()));
+            self.var_manager
+                .update_level(p.var(), self.decision_level());
+            self.var_manager.update_reason(p.var(), from);
             self.trail.push(p);
             self.prop_q.push_back(p);
             true
@@ -463,14 +371,14 @@ impl Solver {
             for q in p_reason {
                 if !seen[q.var()] {
                     seen[q.var()] = true;
-                    if self.var_manager.level[q.var()] == self.decision_level() {
+                    if self.var_manager.get_level(q.var()) == self.decision_level() {
                         counter += 1;
-                    } else if self.var_manager.level[q.var()] > 0 {
+                    } else if self.var_manager.get_level(q.var()) > 0 {
                         out_learnt.push(!q);
-                        out_btlevel = if out_btlevel > self.var_manager.level[q.var()] {
+                        out_btlevel = if out_btlevel > self.var_manager.get_level(q.var()) {
                             out_btlevel
                         } else {
-                            self.var_manager.level[q.var()]
+                            self.var_manager.get_level(q.var())
                         };
                     }
                 }
@@ -480,7 +388,7 @@ impl Solver {
             loop {
                 p = self.trail.last().and_then(|&x| Some(x));
                 let v = p.unwrap().var();
-                confl = self.var_manager.reason[v];
+                confl = self.var_manager.get_reason(v);
                 self.undo_one();
                 if seen[v] {
                     break;
@@ -505,9 +413,9 @@ impl Solver {
     fn undo_one(&mut self) {
         let p = self.trail.last().and_then(|&x| Some(x)).unwrap();
         let x = p.var();
-        self.var_manager.assigns[x] = LBool::Undef;
-        self.var_manager.reason[x] = None;
-        self.var_manager.level[x] = -1;
+        self.var_manager.update_assign(x, LBool::Undef);
+        self.var_manager.update_reason(x, None);
+        self.var_manager.update_level(x, -1);
         self.trail.pop();
     }
 
@@ -538,8 +446,8 @@ impl Solver {
         params: (f64, f64),
     ) -> (LBool, Vec<bool>) {
         let mut conflit_c = 0;
-        self.options.var_decay = 1.0 / params.0;
-        self.options.cla_decay = 1.0 / params.1;
+        self.var_manager.update_var_decay(1.0 / params.0);
+        self.clause_db.update_cla_decay(1.0 / params.1);
 
         loop {
             let confl = self.propagate();
@@ -565,7 +473,7 @@ impl Solver {
                         self.simplify_db();
                     }
 
-                    if self.clause_db.learnts.len() as i32 - self.n_assigns() as i32
+                    if self.clause_db.learnts_len() as i32 - self.n_assigns() as i32
                         >= nof_learnts as i32
                     {
                         self.reduce_db();
@@ -573,12 +481,7 @@ impl Solver {
 
                     if self.n_assigns() == self.n_vars() {
                         // Model found
-                        let model = self
-                            .var_manager
-                            .assigns
-                            .iter()
-                            .map(|&x| x == LBool::True)
-                            .collect();
+                        let model = self.var_manager.model();
                         self.cancel_until(self.root_level);
                         return (LBool::True, model);
                     } else if conflit_c >= nof_conflicts {
@@ -604,14 +507,9 @@ impl Solver {
 
     fn reduce_db(&mut self) {
         let mut i = 0;
-        let lim = self.options.cla_inc / self.clause_db.learnts.len() as f64;
+        let lim = self.clause_db.get_cla_inc() / self.clause_db.learnts_len() as f64;
 
-        let mut acts: Vec<_> = self
-            .clause_db
-            .learnts
-            .iter()
-            .map(|(&i, &(_, a))| (i, a))
-            .collect();
+        let mut acts = self.clause_db.learnt_activities();
         acts.sort_unstable_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap());
 
         while i < acts.len() / 2 {
@@ -622,7 +520,7 @@ impl Solver {
             i += 1;
         }
 
-        while i < self.clause_db.learnts.len() {
+        while i < self.clause_db.learnts_len() {
             let ci = ClauseIndex::Lrnt(acts[i].0);
             if !self.clause_locked(ci) && acts[i].1 < lim {
                 self.clause_remove_learnt(ci);
@@ -636,8 +534,7 @@ impl Solver {
             return false;
         }
 
-        let cls: Vec<_> = self.clause_db.learnts.iter().map(|(&i, _)| i).collect();
-
+        let cls = self.clause_db.learnt_indices();
         for i in cls {
             if self.clause_simplify(ClauseIndex::Lrnt(i)) {
                 self.clause_remove_learnt(ClauseIndex::Lrnt(i));
