@@ -303,7 +303,7 @@ impl Solver {
                 }
                 let ps_0 = ps[0];
                 let ps_1 = ps[1];
-                let ci = self.clause_db.add_learnt(Clause { lits: ps });;
+                let ci = self.clause_db.add_learnt(Clause { lits: ps });
                 self.watches[(!ps_0).index()].push(ci);
                 self.watches[(!ps_1).index()].push(ci);
                 self.clause_db.cla_bump_activity(ci);
@@ -386,7 +386,7 @@ impl Solver {
 
             // Select next literal to look at
             loop {
-                p = self.trail.last().and_then(|&x| Some(x));
+                p = self.trail.last().copied();
                 let v = p.unwrap().var();
                 confl = self.var_manager.get_reason(v);
                 self.undo_one();
@@ -411,7 +411,7 @@ impl Solver {
     }
 
     fn undo_one(&mut self) {
-        let p = self.trail.last().and_then(|&x| Some(x)).unwrap();
+        let p = self.trail.last().copied().unwrap();
         let x = p.var();
         self.var_manager.update_assign(x, LBool::Undef);
         self.var_manager.update_reason(x, None);
