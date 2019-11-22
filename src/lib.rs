@@ -1,4 +1,4 @@
-//! `rsat` is a SAT and MaxSAT Solver.
+//! `rsat` is a SAT Solver.
 //!
 //! ## An example using the SLS solver
 //!
