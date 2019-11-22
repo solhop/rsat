@@ -1,6 +1,6 @@
 [package]
 name = "rsat"
-version = "0.1.6"
+version = "0.1.7"
 authors = ["Prateek Kumar <prateek@prateekkumar.in>"]
 edition = "2018"
 description = """
@@ -21,6 +21,5 @@ maintenance = { status = "actively-developed" }
 [dependencies]
 regex = "1"
 rand = "0.7"
-structopt = "0.3"
 rayon = "1.2"
 error-chain = "0.12"
