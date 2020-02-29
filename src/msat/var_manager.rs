@@ -80,16 +80,18 @@ impl VarManager {
         self.var_decay = var_decay;
     }
 
-    pub fn update_assign(&mut self, var: Var, value: LBool) {
-        self.assigns[var] = value;
-    }
-
     pub fn get_reason(&self, var: Var) -> Option<ClauseIndex> {
         self.reason[var]
     }
 
-    pub fn update_reason(&mut self, var: Var, reason: Option<ClauseIndex>) {
+    pub fn update(&mut self, var: Var, value: LBool, level: i32, reason: Option<ClauseIndex>) {
+        self.assigns[var] = value;
+        self.level[var] = level;
         self.reason[var] = reason;
+    }
+
+    pub fn reset(&mut self, var: Var) {
+        self.update(var, LBool::Undef, -1, None);
     }
 
     pub fn model(&self) -> Vec<bool> {
@@ -98,9 +100,5 @@ impl VarManager {
 
     pub fn get_level(&self, var: Var) -> i32 {
         self.level[var]
-    }
-
-    pub fn update_level(&mut self, var: Var, level: i32) {
-        self.level[var] = level;
     }
 }

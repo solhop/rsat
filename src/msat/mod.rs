@@ -1,9 +1,11 @@
 mod clause_db;
+mod trail;
 mod var_manager;
 
 use crate::*;
 use clause_db::{ClauseDb, ClauseIndex};
 use std::collections::VecDeque;
+use trail::Trail;
 use var_manager::VarManager;
 
 /// Solver options.
@@ -49,8 +51,7 @@ pub struct Solver {
     var_manager: VarManager,
     watches: Vec<Vec<ClauseIndex>>,
     prop_q: VecDeque<Lit>,
-    trail: Vec<Lit>,
-    trail_lim: Vec<i32>,
+    trail: Trail,
     root_level: i32,
 }
 
@@ -62,8 +63,7 @@ impl Solver {
             var_manager: VarManager::new(options.var_inc, options.var_decay),
             watches: vec![],
             prop_q: VecDeque::new(),
-            trail: vec![],
-            trail_lim: vec![],
+            trail: Trail::new(),
             root_level: 0,
         }
     }
@@ -75,7 +75,7 @@ impl Solver {
 
     /// Returns the number of assigned variables in the formula.
     pub fn n_assigns(&self) -> usize {
-        self.trail.len()
+        self.trail.n_assigns()
     }
 
     /// Returns the number of original clauses in the formula.
@@ -100,7 +100,7 @@ impl Solver {
 
     /// Returns the current decision level in the solver.
     pub fn decision_level(&self) -> i32 {
-        self.trail_lim.len() as i32
+        self.trail.decision_level()
     }
 
     /// Add a new variable to the solver.
@@ -293,11 +293,8 @@ impl Solver {
             !(self.value_lit(p) == LBool::False)
         } else {
             self.var_manager
-                .update_assign(p.var(), LBool::from(!p.sign()));
-            self.var_manager
-                .update_level(p.var(), self.decision_level());
-            self.var_manager.update_reason(p.var(), from);
-            self.trail.push(p);
+                .update(p.var(), LBool::from(!p.sign()), self.decision_level(), from);
+            self.trail.add_at_current_dl(p);
             self.prop_q.push_back(p);
             true
         }
@@ -335,10 +332,10 @@ impl Solver {
 
             // Select next literal to look at
             loop {
-                p = self.trail.last().copied();
+                p = self.trail.pop();
                 let v = p.unwrap().var();
                 confl = self.var_manager.get_reason(v);
-                self.undo_one();
+                self.var_manager.reset(v);
                 if seen[v] {
                     break;
                 }
@@ -359,32 +356,14 @@ impl Solver {
         self.enqueue(asserting_lit, c);
     }
 
-    fn undo_one(&mut self) {
-        let p = self.trail.last().copied().unwrap();
-        let x = p.var();
-        self.var_manager.update_assign(x, LBool::Undef);
-        self.var_manager.update_reason(x, None);
-        self.var_manager.update_level(x, -1);
-        self.trail.pop();
-    }
-
     fn assume(&mut self, p: Lit) -> bool {
-        self.trail_lim.push(self.trail.len() as i32);
+        self.trail.new_dl();
         self.enqueue(p, None)
     }
 
-    fn cancel(&mut self) {
-        let mut c = self.trail.len() as i32 - *self.trail_lim.last().unwrap();
-        while c != 0 {
-            self.undo_one();
-            c -= 1;
-        }
-        self.trail_lim.pop();
-    }
-
     fn cancel_until(&mut self, level: i32) {
-        while self.decision_level() > level {
-            self.cancel()
+        for p in self.trail.cancel_until(level) {
+            self.var_manager.reset(p.var());
         }
     }
 
