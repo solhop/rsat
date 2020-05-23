@@ -119,7 +119,7 @@ impl Solver {
     /// If the clause is reason for some variable
     /// (INVARIANT: if it is, then it should be var corresponding to first literal),
     /// then the clause is locked.
-    fn clause_locked(&self, ci: ClauseIndex) -> bool {
+    fn is_clause_locked(&self, ci: ClauseIndex) -> bool {
         let cl = self.clause_db.get_clause_ref(ci);
         self.var_manager.get_reason(cl.lits[0].var()) == Some(ci)
     }
@@ -458,7 +458,7 @@ impl Solver {
         }
     }
 
-    fn clause_remove_learnt(&mut self, ci: ClauseIndex) {
+    fn remove_learnt_clause(&mut self, ci: ClauseIndex) {
         if let ClauseIndex::Lrnt(index) = ci {
             let learnt = self.clause_db.get_learnt(index).unwrap();
             if let Some(i) = self.watches[(!learnt.lits[0]).index()]
@@ -486,16 +486,16 @@ impl Solver {
 
         while i < acts.len() / 2 {
             let ci = ClauseIndex::Lrnt(acts[i].0);
-            if !self.clause_locked(ci) {
-                self.clause_remove_learnt(ci);
+            if !self.is_clause_locked(ci) {
+                self.remove_learnt_clause(ci);
             }
             i += 1;
         }
 
         while i < self.clause_db.learnts_len() {
             let ci = ClauseIndex::Lrnt(acts[i].0);
-            if !self.clause_locked(ci) && acts[i].1 < lim {
-                self.clause_remove_learnt(ci);
+            if !self.is_clause_locked(ci) && acts[i].1 < lim {
+                self.remove_learnt_clause(ci);
             }
             i += 1;
         }
@@ -509,7 +509,7 @@ impl Solver {
         let cls = self.clause_db.learnt_indices();
         for i in cls {
             if self.clause_simplify(ClauseIndex::Lrnt(i)) {
-                self.clause_remove_learnt(ClauseIndex::Lrnt(i));
+                self.remove_learnt_clause(ClauseIndex::Lrnt(i));
             }
         }
         true
