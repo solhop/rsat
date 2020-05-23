@@ -1,6 +1,6 @@
 [package]
 name = "rsat"
-version = "0.1.8"
+version = "0.1.9"
 authors = ["Prateek Kumar <prateek@prateekkumar.in>"]
 edition = "2018"
 description = """
