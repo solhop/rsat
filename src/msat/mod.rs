@@ -116,47 +116,95 @@ impl Solver {
         r
     }
 
-    /// If the clause is reason for some variable
-    /// (INVARIANT: if it is, then it should be var corresponding to first literal),
-    /// then the clause is locked.
-    fn is_clause_locked(&self, ci: ClauseIndex) -> bool {
+    fn varorder_select(&self) -> Var {
+        self.var_manager.select_var()
+    }
+
+    fn clause_locked(&self, ci: ClauseIndex) -> bool {
         let cl = self.clause_db.get_clause_ref(ci);
         self.var_manager.get_reason(cl.lits[0].var()) == Some(ci)
     }
 
-    /// Assume p is true and simplify the clause
-    fn clause_propagate(&mut self, ci: ClauseIndex, p: Lit) -> bool {
-        let clause = match ci {
-            ClauseIndex::Orig(index) => self.clause_db.get_original_mut(index).unwrap(),
-            ClauseIndex::Lrnt(index) => self.clause_db.get_learnt_mut(index).unwrap(),
-        };
-
-        // Make sure false lit at cl.lits[1]
-        if clause.lits[0] == !p {
-            clause.lits[0] = clause.lits[1];
-            clause.lits[1] = !p;
-        }
-
-        // If 0th watch is true, clause is already satisfied
-        if self.var_manager.value_lit(clause.lits[0]) == LBool::True {
-            // Re insert clause into watcher list
-            self.watches[p.index()].push(ci);
-            return true;
-        }
-
-        // Look for a new literal to watch
-        for i in 2..clause.lits.len() {
-            if self.var_manager.value_lit(clause.lits[i]) != LBool::False {
-                clause.lits[1] = clause.lits[i];
-                clause.lits[i] = !p;
-                self.watches[(!clause.lits[1]).index()].push(ci);
-                return true;
+    fn clause_remove_learnt(&mut self, ci: ClauseIndex) {
+        if let ClauseIndex::Lrnt(index) = ci {
+            let learnt = self.clause_db.get_learnt(index).unwrap();
+            if let Some(i) = self.watches[(!learnt.lits[0]).index()]
+                .iter()
+                .position(|&s| s == ci)
+            {
+                self.watches[(!learnt.lits[0]).index()].remove(i);
             }
+            if let Some(i) = self.watches[(!learnt.lits[1]).index()]
+                .iter()
+                .position(|&s| s == ci)
+            {
+                self.watches[(!learnt.lits[1]).index()].remove(i);
+            }
+            self.clause_db.remove_learnt(index);
         }
+    }
 
-        // Clause is unit under assignment
-        self.watches[p.index()].push(ci);
-        let enqueue_lit = clause.lits[0];
+    fn clause_propagate(&mut self, ci: ClauseIndex, p: Lit) -> bool {
+        let enqueue_lit = match ci {
+            ClauseIndex::Orig(index) => {
+                // Make sure false lit at cl.lits[1]
+                let clause = self.clause_db.get_original_mut(index).unwrap();
+                if clause.lits[0] == !p {
+                    clause.lits[0] = clause.lits[1];
+                    clause.lits[1] = !p;
+                }
+
+                // If 0th watch is true, clause is already satisfied
+                if self.var_manager.value_lit(clause.lits[0]) == LBool::True {
+                    // Re insert clause into watcher list
+                    self.watches[p.index()].push(ci);
+                    return true;
+                }
+
+                // Look for a new literal to watch
+                for i in 2..clause.lits.len() {
+                    if self.var_manager.value_lit(clause.lits[i]) != LBool::False {
+                        clause.lits[1] = clause.lits[i];
+                        clause.lits[i] = !p;
+                        self.watches[(!clause.lits[1]).index()].push(ci);
+                        return true;
+                    }
+                }
+
+                // Clause is unit under assignment
+                self.watches[p.index()].push(ci);
+                clause.lits[0]
+            }
+            ClauseIndex::Lrnt(index) => {
+                // Make sure false lit at cl.lits[1]
+                let learnt = self.clause_db.get_learnt_mut(index).unwrap();
+                if learnt.lits[0] == !p {
+                    learnt.lits[0] = learnt.lits[1];
+                    learnt.lits[1] = !p;
+                }
+
+                // If 0th watch is true, clause is already satisfied
+                if self.var_manager.value_lit(learnt.lits[0]) == LBool::True {
+                    // Re insert clause into watcher list
+                    self.watches[p.index()].push(ci);
+                    return true;
+                }
+
+                // Look for a new literal to watch
+                for i in 2..learnt.lits.len() {
+                    if self.var_manager.value_lit(learnt.lits[i]) != LBool::False {
+                        learnt.lits[1] = learnt.lits[i];
+                        learnt.lits[i] = !p;
+                        self.watches[(!learnt.lits[1]).index()].push(ci);
+                        return true;
+                    }
+                }
+
+                // Clause is unit under assignment
+                self.watches[p.index()].push(ci);
+                learnt.lits[0]
+            }
+        };
         self.enqueue(enqueue_lit, Some(ci))
     }
 
@@ -271,17 +319,20 @@ impl Solver {
         self.clause_db.cla_decay_activity();
     }
 
-    /// Propagate unit clauses in prop_q and return when a confliting clause is found
     fn propagate(&mut self) -> Option<ClauseIndex> {
         while !self.prop_q.is_empty() {
             let p = self.prop_q.pop_back().unwrap();
+            let tmp = self.watches[p.index()].clone();
+            self.watches[p.index()].clear();
 
-            while !self.watches[p.index()].is_empty() {
-                let cl = self.watches[p.index()].pop().unwrap();
-                if !self.clause_propagate(cl, p) {
+            for i in 0..tmp.len() {
+                if !self.clause_propagate(tmp[i], p) {
                     // Contraint is conflicting
+                    for &c_i in tmp.iter().skip(i + 1) {
+                        self.watches[p.index()].push(c_i);
+                    }
                     self.prop_q.clear();
-                    return Some(cl);
+                    return Some(tmp[i]);
                 }
             }
         }
@@ -381,18 +432,18 @@ impl Solver {
         &mut self,
         nof_conflicts: u32,
         nof_learnts: u32,
-        decay_params: (f64, f64),
+        params: (f64, f64),
     ) -> (LBool, Vec<bool>) {
-        let mut conflit_count = 0;
-        self.var_manager.update_var_decay(1.0 / decay_params.0);
-        self.clause_db.update_cla_decay(1.0 / decay_params.1);
+        let mut conflit_c = 0;
+        self.var_manager.update_var_decay(1.0 / params.0);
+        self.clause_db.update_cla_decay(1.0 / params.1);
 
         loop {
             let confl = self.propagate();
             match confl {
                 // Conflit
                 Some(c) => {
-                    conflit_count += 1;
+                    conflit_c += 1;
                     if self.decision_level() == self.root_level {
                         return (LBool::False, vec![]);
                     }
@@ -422,7 +473,7 @@ impl Solver {
                         let model = self.var_manager.model();
                         self.cancel_until(self.root_level);
                         return (LBool::True, model);
-                    } else if conflit_count >= nof_conflicts {
+                    } else if conflit_c >= nof_conflicts {
                         // Force a restart
                         self.cancel_until(self.root_level);
                         // println!(
@@ -435,30 +486,11 @@ impl Solver {
                         return (LBool::Undef, vec![]);
                     } else {
                         // New variable decision
-                        let p = Lit::new(self.var_manager.select_var(), false);
+                        let p = Lit::new(self.varorder_select(), false);
                         self.assume(p);
                     }
                 }
             }
-        }
-    }
-
-    fn remove_learnt_clause(&mut self, ci: ClauseIndex) {
-        if let ClauseIndex::Lrnt(index) = ci {
-            let learnt = self.clause_db.get_learnt(index).unwrap();
-            if let Some(i) = self.watches[(!learnt.lits[0]).index()]
-                .iter()
-                .position(|&s| s == ci)
-            {
-                self.watches[(!learnt.lits[0]).index()].remove(i);
-            }
-            if let Some(i) = self.watches[(!learnt.lits[1]).index()]
-                .iter()
-                .position(|&s| s == ci)
-            {
-                self.watches[(!learnt.lits[1]).index()].remove(i);
-            }
-            self.clause_db.remove_learnt(index);
         }
     }
 
@@ -471,16 +503,16 @@ impl Solver {
 
         while i < acts.len() / 2 {
             let ci = ClauseIndex::Lrnt(acts[i].0);
-            if !self.is_clause_locked(ci) {
-                self.remove_learnt_clause(ci);
+            if !self.clause_locked(ci) {
+                self.clause_remove_learnt(ci);
             }
             i += 1;
         }
 
         while i < self.clause_db.learnts_len() {
             let ci = ClauseIndex::Lrnt(acts[i].0);
-            if !self.is_clause_locked(ci) && acts[i].1 < lim {
-                self.remove_learnt_clause(ci);
+            if !self.clause_locked(ci) && acts[i].1 < lim {
+                self.clause_remove_learnt(ci);
             }
             i += 1;
         }
@@ -494,7 +526,7 @@ impl Solver {
         let cls = self.clause_db.learnt_indices();
         for i in cls {
             if self.clause_simplify(ClauseIndex::Lrnt(i)) {
-                self.remove_learnt_clause(ClauseIndex::Lrnt(i));
+                self.clause_remove_learnt(ClauseIndex::Lrnt(i));
             }
         }
         true
