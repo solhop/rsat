@@ -1,8 +1,8 @@
 use crate::*;
 
 pub struct Trail {
-    trail: Vec<Lit>,
-    trail_lim: Vec<i32>,
+    pub trail: Vec<Lit>,
+    pub trail_lim: Vec<i32>,
 }
 
 impl Trail {
@@ -31,17 +31,5 @@ impl Trail {
 
     pub fn pop(&mut self) -> Option<Lit> {
         self.trail.pop()
-    }
-
-    pub fn cancel_until(&mut self, level: i32) -> Vec<Lit> {
-        let mut cancelled = vec![];
-        while self.decision_level() > level {
-            let dl_index = *self.trail_lim.last().unwrap();
-            while self.trail.len() as i32 != dl_index {
-                cancelled.push(self.trail.pop().unwrap());
-            }
-            self.trail_lim.pop();
-        }
-        cancelled
     }
 }

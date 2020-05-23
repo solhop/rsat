@@ -27,11 +27,12 @@ impl VarManager {
     }
 
     pub fn new_var(&mut self) -> Var {
+        let v = self.n_vars();
         self.reason.push(None);
         self.assigns.push(LBool::Undef);
         self.level.push(-1);
         self.activity.push(0.0);
-        self.n_vars()
+        v
     }
 
     pub fn value(&self, x: Var) -> LBool {

@@ -361,9 +361,19 @@ impl Solver {
         self.enqueue(p, None)
     }
 
-    fn cancel_until(&mut self, level: i32) {
-        for p in self.trail.cancel_until(level) {
+    fn cancel(&mut self) {
+        let mut c = self.trail.trail.len() as i32 - *self.trail.trail_lim.last().unwrap();
+        while c != 0 {
+            let p = self.trail.pop().unwrap();
             self.var_manager.reset(p.var());
+            c -= 1;
+        }
+        self.trail.trail_lim.pop();
+    }
+
+    fn cancel_until(&mut self, level: i32) {
+        while self.trail.decision_level() > level {
+            self.cancel();
         }
     }
 
