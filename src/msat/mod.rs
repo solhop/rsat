@@ -116,32 +116,9 @@ impl Solver {
         r
     }
 
-    fn varorder_select(&self) -> Var {
-        self.var_manager.select_var()
-    }
-
     fn clause_locked(&self, ci: ClauseIndex) -> bool {
         let cl = self.clause_db.get_clause_ref(ci);
         self.var_manager.get_reason(cl.lits[0].var()) == Some(ci)
-    }
-
-    fn clause_remove_learnt(&mut self, ci: ClauseIndex) {
-        if let ClauseIndex::Lrnt(index) = ci {
-            let learnt = self.clause_db.get_learnt(index).unwrap();
-            if let Some(i) = self.watches[(!learnt.lits[0]).index()]
-                .iter()
-                .position(|&s| s == ci)
-            {
-                self.watches[(!learnt.lits[0]).index()].remove(i);
-            }
-            if let Some(i) = self.watches[(!learnt.lits[1]).index()]
-                .iter()
-                .position(|&s| s == ci)
-            {
-                self.watches[(!learnt.lits[1]).index()].remove(i);
-            }
-            self.clause_db.remove_learnt(index);
-        }
     }
 
     fn clause_propagate(&mut self, ci: ClauseIndex, p: Lit) -> bool {
@@ -432,18 +409,18 @@ impl Solver {
         &mut self,
         nof_conflicts: u32,
         nof_learnts: u32,
-        params: (f64, f64),
+        decay_params: (f64, f64),
     ) -> (LBool, Vec<bool>) {
-        let mut conflit_c = 0;
-        self.var_manager.update_var_decay(1.0 / params.0);
-        self.clause_db.update_cla_decay(1.0 / params.1);
+        let mut conflit_count = 0;
+        self.var_manager.update_var_decay(1.0 / decay_params.0);
+        self.clause_db.update_cla_decay(1.0 / decay_params.1);
 
         loop {
             let confl = self.propagate();
             match confl {
                 // Conflit
                 Some(c) => {
-                    conflit_c += 1;
+                    conflit_count += 1;
                     if self.decision_level() == self.root_level {
                         return (LBool::False, vec![]);
                     }
@@ -473,7 +450,7 @@ impl Solver {
                         let model = self.var_manager.model();
                         self.cancel_until(self.root_level);
                         return (LBool::True, model);
-                    } else if conflit_c >= nof_conflicts {
+                    } else if conflit_count >= nof_conflicts {
                         // Force a restart
                         self.cancel_until(self.root_level);
                         // println!(
@@ -486,11 +463,30 @@ impl Solver {
                         return (LBool::Undef, vec![]);
                     } else {
                         // New variable decision
-                        let p = Lit::new(self.varorder_select(), false);
+                        let p = Lit::new(self.var_manager.select_var(), false);
                         self.assume(p);
                     }
                 }
             }
+        }
+    }
+
+    fn clause_remove_learnt(&mut self, ci: ClauseIndex) {
+        if let ClauseIndex::Lrnt(index) = ci {
+            let learnt = self.clause_db.get_learnt(index).unwrap();
+            if let Some(i) = self.watches[(!learnt.lits[0]).index()]
+                .iter()
+                .position(|&s| s == ci)
+            {
+                self.watches[(!learnt.lits[0]).index()].remove(i);
+            }
+            if let Some(i) = self.watches[(!learnt.lits[1]).index()]
+                .iter()
+                .position(|&s| s == ci)
+            {
+                self.watches[(!learnt.lits[1]).index()].remove(i);
+            }
+            self.clause_db.remove_learnt(index);
         }
     }
 
