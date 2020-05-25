@@ -482,13 +482,7 @@ impl Solver {
                     } else if conflit_count >= nof_conflicts {
                         // Force a restart
                         self.cancel_until(self.root_level);
-                        // println!(
-                        //     "c Restarting after {} conflicts, learnt {} {}, clauses {}",
-                        //     conflit_c,
-                        //     self.clause_db.learnts.len(),
-                        //     nof_learnts,
-                        //     self.clause_db.original.len()
-                        // );
+
                         return (LBool::Undef, vec![]);
                     } else {
                         // New variable decision

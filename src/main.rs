@@ -111,11 +111,12 @@ fn main() {
         _ => panic!("Invalid algorithm"),
     };
     match solution {
-        Unsat => println!("UNSAT"),
-        Unknown => println!("UNKNOWN"),
+        Unsat => println!("s UNSATISFIABLE"),
+        Unknown => println!("s UNKNOWN"),
         Best(solution) => {
-            println!("UNKNOWN");
+            println!("s UNKNOWN");
             let solution = solution.iter().map(|&x| if x { 1 } else { -1 });
+            print!("v ");
             for (i, v) in solution.enumerate() {
                 print!("{} ", v * ((i + 1) as i32));
             }
@@ -125,7 +126,8 @@ fn main() {
             if !formula.verify(&solution) {
                 panic!("Solver gave incorrect model");
             }
-            println!("SAT");
+            println!("s SATISFIABLE");
+            print!("v ");
             let solution = solution.iter().map(|&x| if x { 1 } else { -1 });
             for (i, v) in solution.enumerate() {
                 print!("{} ", v * ((i + 1) as i32));
