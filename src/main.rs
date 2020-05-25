@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
@@ -20,11 +22,18 @@ struct Opt {
     /// Maxinum number of flips in each try of SLS
     #[structopt(long = "max-flips", default_value = "1000")]
     max_flips: u32,
+    /// Drat file to log conflict clauses addition and deletion
+    #[structopt(long, parse(from_os_str))]
+    drat: Option<PathBuf>,
 }
 
 fn main() {
     let opt = Opt::from_args();
     let mut formula = rsat::sls::Solver::new_from_file(opt.file.to_str().unwrap()).unwrap();
+    let drat = match opt.drat {
+        Some(drat) => Some(File::create(drat).expect("Drat file not found")),
+        None => None,
+    };
 
     use rsat::Solution::*;
     let solution = match opt.alg {
@@ -33,7 +42,12 @@ fn main() {
                 panic!("Parallelism is not implemented for CDCL solver yet.");
             }
             use rsat::msat::*;
-            let mut solver = Solver::new(SolverOptions::default());
+            let mut options = SolverOptions::default();
+            if drat.is_some() {
+                options.option(SolverOption::CaptureDrat);
+            }
+            let mut solver = Solver::new(options);
+
             for _ in 0..formula.n_vars() {
                 solver.new_var();
             }
@@ -45,7 +59,31 @@ fn main() {
                     return;
                 }
             }
-            solver.solve(vec![])
+            let solution = solver.solve(vec![]);
+            if let Unsat = solution {
+                if let Some(mut drat_file) = drat {
+                    for (lits, is_delete) in solver.drat_clauses() {
+                        if is_delete {
+                            write!(drat_file, "d ").unwrap();
+                            write!(drat_file, "d ").unwrap();
+                        }
+                        for lit in lits.iter() {
+                            write!(
+                                drat_file,
+                                "{} ",
+                                if lit.sign() {
+                                    -(lit.var() as i32 + 1)
+                                } else {
+                                    lit.var() as i32 + 1
+                                }
+                            )
+                            .unwrap();
+                        }
+                        writeln!(drat_file, "0").unwrap();
+                    }
+                }
+            }
+            solution
         }
         2 => formula.local_search(
             opt.max_tries,

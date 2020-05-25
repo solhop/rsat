@@ -13,7 +13,7 @@ impl Lit {
         self.0 & 1 == 1
     }
 
-    /// Returns the var cooressponding to the literal.
+    /// Returns the var corresponding to the literal.
     pub fn var(self) -> Var {
         self.0 >> 1
     }
@@ -76,7 +76,7 @@ impl From<bool> for LBool {
 }
 
 /// A Clause.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Clause {
     /// A vector of literals forming the clause.
     pub lits: Vec<Lit>,

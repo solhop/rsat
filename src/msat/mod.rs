@@ -14,6 +14,7 @@ pub struct SolverOptions {
     cla_decay: f64,
     var_inc: f64,
     var_decay: f64,
+    capture_drat: bool,
 }
 
 /// Different Solver Options.
@@ -22,6 +23,8 @@ pub enum SolverOption {
     ClaDecay(f64),
     /// The variable activity decay factor.
     VarDecay(f64),
+    /// Should capture conflict clauses for drat output,
+    CaptureDrat,
 }
 
 impl Default for SolverOptions {
@@ -31,6 +34,7 @@ impl Default for SolverOptions {
             cla_decay: 0.999,
             var_inc: 1.0,
             var_decay: 0.95,
+            capture_drat: false,
         }
     }
 }
@@ -41,6 +45,27 @@ impl SolverOptions {
         match option {
             SolverOption::ClaDecay(v) => self.cla_decay = v,
             SolverOption::VarDecay(v) => self.var_decay = v,
+            SolverOption::CaptureDrat => self.capture_drat = true,
+        }
+    }
+}
+
+struct DratClauses {
+    drat_clauses: Vec<(Vec<Lit>, bool)>,
+    capture_drat: bool,
+}
+
+impl DratClauses {
+    fn new(capture_drat: bool) -> Self {
+        Self {
+            drat_clauses: vec![],
+            capture_drat,
+        }
+    }
+
+    fn capture(&mut self, lits: &Vec<Lit>, is_delete: bool) {
+        if self.capture_drat {
+            self.drat_clauses.push((lits.clone(), is_delete));
         }
     }
 }
@@ -53,18 +78,21 @@ pub struct Solver {
     prop_q: VecDeque<Lit>,
     trail: Trail,
     root_level: i32,
+    drat_clauses: DratClauses,
 }
 
 impl Solver {
     /// Create a new CDCL solver.
+    /// Set drat callback which takes (lits, is_delete)
     pub fn new(options: SolverOptions) -> Self {
-        Solver {
+        Self {
             clause_db: ClauseDb::new(options.cla_inc, options.cla_decay),
             var_manager: VarManager::new(options.var_inc, options.var_decay),
             watches: vec![],
             prop_q: VecDeque::new(),
             trail: Trail::new(),
             root_level: 0,
+            drat_clauses: DratClauses::new(options.capture_drat),
         }
     }
 
@@ -114,6 +142,15 @@ impl Solver {
     pub fn new_clause(&mut self, lits: Vec<Lit>) -> bool {
         let (r, _) = self.clause_new(lits, false);
         r
+    }
+
+    /// Drat clauses
+    pub fn drat_clauses(self) -> Vec<(Vec<Lit>, bool)> {
+        if self.drat_clauses.capture_drat {
+            self.drat_clauses.drat_clauses
+        } else {
+            vec![]
+        }
     }
 
     /// If the clause is reason for some variable
@@ -366,6 +403,8 @@ impl Solver {
     }
 
     fn record(&mut self, clause: Vec<Lit>) {
+        // Added here because clause_new doesn't add unit clauses to clause_db
+        self.drat_clauses.capture(&clause, false);
         let asserting_lit = clause[0];
         let (_, c) = self.clause_new(clause, true);
         self.enqueue(asserting_lit, c);
@@ -377,13 +416,12 @@ impl Solver {
     }
 
     fn cancel(&mut self) {
-        let mut c = self.trail.trail.len() as i32 - *self.trail.trail_lim.last().unwrap();
+        let mut c = self.trail.trail_len() as i32 - self.trail.trail_lim_pop().unwrap();
         while c != 0 {
             let p = self.trail.pop().unwrap();
             self.var_manager.reset(p.var());
             c -= 1;
         }
-        self.trail.trail_lim.pop();
     }
 
     fn cancel_until(&mut self, level: i32) {
@@ -473,6 +511,7 @@ impl Solver {
             {
                 self.watches[(!learnt.lits[1]).index()].remove(i);
             }
+            self.drat_clauses.capture(&learnt.lits, true);
             self.clause_db.remove_learnt(index);
         }
     }
@@ -517,6 +556,14 @@ impl Solver {
 
     /// Solve the SAT formula under given assumptions.
     pub fn solve(&mut self, assumps: Vec<Lit>) -> Solution {
+        let solution = self.solve_(assumps);
+        if let Solution::Unsat = solution {
+            self.drat_clauses.capture(&vec![], false);
+        }
+        solution
+    }
+
+    fn solve_(&mut self, assumps: Vec<Lit>) -> Solution {
         let params = (0.95, 0.999);
         let restart_first = 100.0;
         let restart_inc = 2.0f64;

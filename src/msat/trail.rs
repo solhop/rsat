@@ -1,8 +1,9 @@
 use crate::*;
 
+#[derive(Debug)]
 pub struct Trail {
-    pub trail: Vec<Lit>,
-    pub trail_lim: Vec<i32>,
+    trail: Vec<Lit>,
+    trail_lim: Vec<i32>,
 }
 
 impl Trail {
@@ -31,5 +32,13 @@ impl Trail {
 
     pub fn pop(&mut self) -> Option<Lit> {
         self.trail.pop()
+    }
+
+    pub fn trail_len(&self) -> usize {
+        self.trail.len()
+    }
+
+    pub fn trail_lim_pop(&mut self) -> Option<i32> {
+        self.trail_lim.pop()
     }
 }
