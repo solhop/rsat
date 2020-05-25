@@ -27,6 +27,30 @@ struct Opt {
     drat: Option<PathBuf>,
 }
 
+// Function to write drat clauses to file
+fn write_drat_clauses(drat: Option<File>, solver: rsat::msat::Solver) {
+    if let Some(mut drat_file) = drat {
+        for (lits, is_delete) in solver.drat_clauses() {
+            if is_delete {
+                write!(drat_file, "d ").unwrap();
+            }
+            for lit in lits.iter() {
+                write!(
+                    drat_file,
+                    "{} ",
+                    if lit.sign() {
+                        -(lit.var() as i32 + 1)
+                    } else {
+                        lit.var() as i32 + 1
+                    }
+                )
+                .unwrap();
+            }
+            writeln!(drat_file, "0").unwrap();
+        }
+    }
+}
+
 fn main() {
     let opt = Opt::from_args();
     let mut formula = rsat::sls::Solver::new_from_file(opt.file.to_str().unwrap()).unwrap();
@@ -41,7 +65,9 @@ fn main() {
             if opt.parallel {
                 panic!("Parallelism is not implemented for CDCL solver yet.");
             }
+
             use rsat::msat::*;
+
             let mut options = SolverOptions::default();
             if drat.is_some() {
                 options.option(SolverOption::CaptureDrat);
@@ -51,37 +77,28 @@ fn main() {
             for _ in 0..formula.n_vars() {
                 solver.new_var();
             }
-            for i in 0..formula.n_clauses() {
-                let c = formula.ith_clause(i);
-                let r = solver.new_clause(c.lits.clone());
-                if !r {
-                    println!("UNSAT");
-                    return;
-                }
-            }
-            let solution = solver.solve(vec![]);
-            if let Unsat = solution {
-                if let Some(mut drat_file) = drat {
-                    for (lits, is_delete) in solver.drat_clauses() {
-                        if is_delete {
-                            write!(drat_file, "d ").unwrap();
-                            write!(drat_file, "d ").unwrap();
-                        }
-                        for lit in lits.iter() {
-                            write!(
-                                drat_file,
-                                "{} ",
-                                if lit.sign() {
-                                    -(lit.var() as i32 + 1)
-                                } else {
-                                    lit.var() as i32 + 1
-                                }
-                            )
-                            .unwrap();
-                        }
-                        writeln!(drat_file, "0").unwrap();
+
+            let add_failed = {
+                let mut add_failed = false;
+                for i in 0..formula.n_clauses() {
+                    let c = formula.ith_clause(i);
+                    let r = solver.new_clause(c.lits.clone());
+                    if !r {
+                        add_failed = true;
+                        break;
                     }
                 }
+                add_failed
+            };
+
+            let solution = if add_failed {
+                Unsat
+            } else {
+                solver.solve(vec![])
+            };
+
+            if let Unsat = solution {
+                write_drat_clauses(drat, solver);
             }
             solution
         }

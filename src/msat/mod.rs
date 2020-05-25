@@ -141,6 +141,10 @@ impl Solver {
     /// Add a new clause to the solver.
     pub fn new_clause(&mut self, lits: Vec<Lit>) -> bool {
         let (r, _) = self.clause_new(lits, false);
+        if !r {
+            // In case new clause returns false, formula is unsat and solver is in undef state
+            self.drat_clauses.capture(&vec![], false);
+        }
         r
     }
 
