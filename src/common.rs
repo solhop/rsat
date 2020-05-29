@@ -1,7 +1,7 @@
 use std::ops::Not;
 
 /// A variable.
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Var(usize);
 
 impl Var {
