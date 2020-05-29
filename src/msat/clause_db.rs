@@ -110,8 +110,11 @@ impl ClauseDb {
         self.cla_decay = cla_decay;
     }
 
-    pub fn learnt_activities(&self) -> Vec<(usize, f64)> {
-        self.learnts.iter().map(|(&i, &(_, a))| (i, a)).collect()
+    pub fn learnt_activities(&self) -> Vec<(usize, f64, usize)> {
+        self.learnts
+            .iter()
+            .map(|(&i, (cl, a))| (i, *a, cl.lits.len()))
+            .collect()
     }
 
     pub fn learnt_indices(&self) -> Vec<usize> {

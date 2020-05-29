@@ -371,8 +371,8 @@ impl Solver {
 
             // Trace reason for p
             for q in p_reason {
-                if !seen[q.var()] {
-                    seen[q.var()] = true;
+                if !seen[q.var().index()] {
+                    seen[q.var().index()] = true;
                     if self.var_manager.get_level(q.var()) == self.decision_level() {
                         counter += 1;
                     } else if self.var_manager.get_level(q.var()) > 0 {
@@ -392,7 +392,7 @@ impl Solver {
                 let v = p.unwrap().var();
                 confl = self.var_manager.get_reason(v);
                 self.var_manager.reset(v);
-                if seen[v] {
+                if seen[v.index()] {
                     break;
                 }
             }
@@ -519,7 +519,13 @@ impl Solver {
         let lim = self.clause_db.get_cla_inc() / self.clause_db.learnts_len() as f64;
 
         let mut acts = self.clause_db.learnt_activities();
-        acts.sort_unstable_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap());
+        // Using clause length does help (TODO)
+        // acts.sort_by(|(_, a1, l1), (_, a2, l2)| match l2.cmp(l1) {
+        //     std::cmp::Ordering::Less => std::cmp::Ordering::Less,
+        //     std::cmp::Ordering::Equal => a1.partial_cmp(a2).unwrap(),
+        //     std::cmp::Ordering::Greater => std::cmp::Ordering::Greater,
+        // });
+        acts.sort_by(|(_, a1, _), (_, a2, _)| a1.partial_cmp(a2).unwrap());
 
         while i < acts.len() / 2 {
             let ci = ClauseIndex::Lrnt(acts[i].0);

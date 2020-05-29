@@ -39,9 +39,9 @@ fn write_drat_clauses(drat: Option<File>, solver: rsat::msat::Solver) {
                     drat_file,
                     "{} ",
                     if lit.sign() {
-                        -(lit.var() as i32 + 1)
+                        -(lit.var().index() as i32 + 1)
                     } else {
-                        lit.var() as i32 + 1
+                        lit.var().index() as i32 + 1
                     }
                 )
                 .unwrap();

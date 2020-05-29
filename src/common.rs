@@ -1,7 +1,21 @@
 use std::ops::Not;
 
 /// A variable.
-pub type Var = usize;
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct Var(usize);
+
+impl Var {
+    /// Create new var
+    pub fn new(index: usize) -> Self {
+        Self(index)
+    }
+
+    /// Returns the actual value stored inside
+    /// that can be used to index arrays.
+    pub fn index(self) -> usize {
+        self.0
+    }
+}
 
 /// A literal.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -15,7 +29,7 @@ impl Lit {
 
     /// Returns the var corresponding to the literal.
     pub fn var(self) -> Var {
-        self.0 >> 1
+        Var(self.0 >> 1)
     }
 
     /// Returns the actual value stored inside
@@ -26,7 +40,7 @@ impl Lit {
 
     /// Create lit from var and sign
     pub fn new(var: Var, sign: bool) -> Lit {
-        Lit(var + var + (sign as usize))
+        Lit(var.0 + var.0 + (sign as usize))
     }
 }
 

@@ -32,36 +32,32 @@ impl VarManager {
         self.assigns.push(LBool::Undef);
         self.level.push(-1);
         self.activity.push(0.0);
-        v
+        Var::new(v)
     }
 
     pub fn value(&self, x: Var) -> LBool {
-        self.assigns[x]
+        self.assigns[x.index()]
     }
 
     pub fn value_lit(&self, p: Lit) -> LBool {
         if p.sign() {
-            !self.assigns[p.var()]
+            !self.assigns[p.var().index()]
         } else {
-            self.assigns[p.var()]
+            self.assigns[p.var().index()]
         }
     }
 
     pub fn select_var(&self) -> Var {
-        let mut max_i = 0;
-        for i in 0..self.activity.len() {
-            if self.value(i) == LBool::Undef
-                && (self.value(max_i) != LBool::Undef || self.activity[i] > self.activity[max_i])
-            {
-                max_i = i;
-            }
-        }
-        max_i
+        let max_v = (0..self.n_vars())
+            .filter(|v| self.value(Var::new(*v)) == LBool::Undef)
+            .max_by(|&x, &y| self.activity[x].partial_cmp(&self.activity[y]).unwrap())
+            .unwrap();
+        Var::new(max_v)
     }
 
     pub fn var_bump_activity(&mut self, x: Var) {
-        self.activity[x] += self.var_inc;
-        if self.activity[x] > 1e100 {
+        self.activity[x.index()] += self.var_inc;
+        if self.activity[x.index()] > 1e100 {
             self.var_rescale_activity();
         }
     }
@@ -82,13 +78,13 @@ impl VarManager {
     }
 
     pub fn get_reason(&self, var: Var) -> Option<ClauseIndex> {
-        self.reason[var]
+        self.reason[var.index()]
     }
 
     pub fn update(&mut self, var: Var, value: LBool, level: i32, reason: Option<ClauseIndex>) {
-        self.assigns[var] = value;
-        self.level[var] = level;
-        self.reason[var] = reason;
+        self.assigns[var.index()] = value;
+        self.level[var.index()] = level;
+        self.reason[var.index()] = reason;
     }
 
     pub fn reset(&mut self, var: Var) {
@@ -100,6 +96,6 @@ impl VarManager {
     }
 
     pub fn get_level(&self, var: Var) -> i32 {
-        self.level[var]
+        self.level[var.index()]
     }
 }

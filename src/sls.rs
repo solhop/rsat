@@ -115,7 +115,7 @@ impl Solver {
                             let mut clause_unsat = 1;
                             for lit in &cl.lits {
                                 let var = lit.var();
-                                if lit.sign() != curr_model[var] {
+                                if lit.sign() != curr_model[var.index()] {
                                     clause_unsat = 0;
                                     break;
                                 }
@@ -132,7 +132,7 @@ impl Solver {
                             let mut clause_unsat = 1;
                             for lit in &cl.lits {
                                 let var = lit.var();
-                                if lit.sign() != curr_model[var] {
+                                if lit.sign() != curr_model[var.index()] {
                                     clause_unsat = 0;
                                     break;
                                 }
@@ -158,7 +158,7 @@ impl Solver {
                 for x in cl {
                     let var_i = x.var();
 
-                    curr_model[var_i] = !curr_model[var_i];
+                    curr_model[var_i.index()] = !curr_model[var_i.index()];
                     let (break_count, make_count) = if parallel {
                         self.clauses
                             .par_iter()
@@ -167,7 +167,7 @@ impl Solver {
                                 let mut cl_unsat = 1;
                                 for &lit in cl {
                                     let var = lit.var();
-                                    if lit.sign() != curr_model[var] {
+                                    if lit.sign() != curr_model[var.index()] {
                                         cl_unsat = 0;
                                         break;
                                     }
@@ -194,7 +194,7 @@ impl Solver {
                                 let mut cl_unsat = 1;
                                 for &lit in cl {
                                     let var = lit.var();
-                                    if lit.sign() != curr_model[var] {
+                                    if lit.sign() != curr_model[var.index()] {
                                         cl_unsat = 0;
                                         break;
                                     }
@@ -215,9 +215,9 @@ impl Solver {
                             .fold((0, 0), |a, b| (a.0 + b.0, a.1 + b.1))
                     };
 
-                    curr_model[var_i] = !curr_model[var_i];
+                    curr_model[var_i.index()] = !curr_model[var_i.index()];
 
-                    scores[var_i] = match &score_fn_type {
+                    scores[var_i.index()] = match &score_fn_type {
                         ScoreFnType::Rand => 1.0,
                         ScoreFnType::Poly => 1.0 / (1.0 + break_count as f32).powf(C_BREAK),
                         ScoreFnType::Exp => C_MAKE.powi(make_count) / C_BREAK.powi(break_count),
@@ -254,7 +254,7 @@ impl Solver {
             let mut cla_sat = false;
             for &lit in cl.iter() {
                 let var = lit.var();
-                if lit.sign() != model[var] {
+                if lit.sign() != model[var.index()] {
                     cla_sat = true;
                     break;
                 }
