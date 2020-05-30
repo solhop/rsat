@@ -62,7 +62,8 @@ impl SolverOptions {
     }
 }
 
-struct DratClauses {
+/// Storage for drat clauses
+pub(crate) struct DratClauses {
     drat_clauses: Vec<(Vec<Lit>, bool)>,
     capture_drat: bool,
 }
@@ -169,14 +170,6 @@ impl Solver {
         }
     }
 
-    /// If the clause is reason for some variable
-    /// (INVARIANT: if it is, then it should be var corresponding to first literal),
-    /// then the clause is locked.
-    fn is_clause_locked(&self, ci: ClauseIndex) -> bool {
-        let cl = self.clause_db.get_clause_ref(ci);
-        self.var_manager.get_reason(cl.lits[0].var()) == Some(ci)
-    }
-
     /// Assume p is true and simplify the clause
     fn clause_propagate(&mut self, ci: ClauseIndex, p: Lit) -> bool {
         let clause = match ci {
@@ -243,7 +236,7 @@ impl Solver {
             debug_assert!(self.value_lit(cl.lits[i]) == LBool::False);
             reason.push(!cl.lits[i]);
         }
-        self.clause_db.cla_bump_activity(ci);
+        self.clause_db.found_clause_as_reason(ci);
         reason
     }
 
@@ -309,7 +302,6 @@ impl Solver {
                 let ci = self.clause_db.add_learnt(Clause { lits: ps });
                 self.watches[(!ps_0).index()].push(ci);
                 self.watches[(!ps_1).index()].push(ci);
-                self.clause_db.cla_bump_activity(ci);
                 ci
             };
 
@@ -458,9 +450,7 @@ impl Solver {
     }
 
     fn search(&mut self, nof_conflicts: u32, nof_learnts: u32) -> (LBool, Vec<bool>) {
-        let params = (0.95, 0.999);
         let mut conflit_count = 0;
-        self.clause_db.update_cla_decay(1.0 / params.1);
 
         loop {
             let confl = self.propagate();
@@ -479,7 +469,7 @@ impl Solver {
                     });
                     self.record(learnt_clause);
                     self.var_manager.after_record_learnt_clause();
-                    self.clause_db.cla_decay_activity();
+                    self.clause_db.after_record_learnt_clause();
                 }
                 // No Conflict
                 None => {
@@ -513,54 +503,9 @@ impl Solver {
         }
     }
 
-    fn remove_learnt_clause(&mut self, ci: ClauseIndex) {
-        if let ClauseIndex::Lrnt(index) = ci {
-            let learnt = self.clause_db.get_learnt(index).unwrap();
-            if let Some(i) = self.watches[(!learnt.lits[0]).index()]
-                .iter()
-                .position(|&s| s == ci)
-            {
-                self.watches[(!learnt.lits[0]).index()].remove(i);
-            }
-            if let Some(i) = self.watches[(!learnt.lits[1]).index()]
-                .iter()
-                .position(|&s| s == ci)
-            {
-                self.watches[(!learnt.lits[1]).index()].remove(i);
-            }
-            self.drat_clauses.capture(&learnt.lits, true);
-            self.clause_db.remove_learnt(index);
-        }
-    }
-
     fn reduce_db(&mut self) {
-        let mut i = 0;
-        let lim = self.clause_db.get_cla_inc() / self.clause_db.learnts_len() as f64;
-
-        let mut acts = self.clause_db.learnt_activities();
-        // Using clause length does help (TODO)
-        // acts.sort_by(|(_, a1, l1), (_, a2, l2)| match l2.cmp(l1) {
-        //     std::cmp::Ordering::Less => std::cmp::Ordering::Less,
-        //     std::cmp::Ordering::Equal => a1.partial_cmp(a2).unwrap(),
-        //     std::cmp::Ordering::Greater => std::cmp::Ordering::Greater,
-        // });
-        acts.sort_by(|(_, a1, _), (_, a2, _)| a1.partial_cmp(a2).unwrap());
-
-        while i < acts.len() / 2 {
-            let ci = ClauseIndex::Lrnt(acts[i].0);
-            if !self.is_clause_locked(ci) {
-                self.remove_learnt_clause(ci);
-            }
-            i += 1;
-        }
-
-        while i < self.clause_db.learnts_len() {
-            let ci = ClauseIndex::Lrnt(acts[i].0);
-            if !self.is_clause_locked(ci) && acts[i].1 < lim {
-                self.remove_learnt_clause(ci);
-            }
-            i += 1;
-        }
+        self.clause_db
+            .reduce_db(&self.var_manager, &mut self.watches, &mut self.drat_clauses);
     }
 
     fn simplify_db(&mut self) -> bool {
@@ -571,7 +516,8 @@ impl Solver {
         let cls = self.clause_db.learnt_indices();
         for i in cls {
             if self.clause_simplify(ClauseIndex::Lrnt(i)) {
-                self.remove_learnt_clause(ClauseIndex::Lrnt(i));
+                self.clause_db
+                    .remove_learnt(i, &mut self.watches, &mut self.drat_clauses);
             }
         }
         true
