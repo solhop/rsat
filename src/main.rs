@@ -69,6 +69,12 @@ fn main() {
             use rsat::msat::*;
 
             let mut options = SolverOptions::default();
+            // options.option(SolverOption::BranchingHeuristic(
+            //     BranchingHeuristic::Vsids {
+            //         var_inc: 1.0,
+            //         var_decay: 0.95,
+            //     },
+            // ));
             if drat.is_some() {
                 options.option(SolverOption::CaptureDrat);
             }

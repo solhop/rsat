@@ -8,12 +8,26 @@ use std::collections::VecDeque;
 use trail::Trail;
 use var_manager::VarManager;
 
+/// Branching heuristic to be used for msat
+pub enum BranchingHeuristic {
+    /// VSIDS
+    Vsids {
+        /// Var increment
+        var_inc: f64,
+        ///Var decay
+        var_decay: f64,
+    },
+    /// LRB
+    Lrb,
+}
+
 /// Solver options.
 pub struct SolverOptions {
     cla_inc: f64,
     cla_decay: f64,
-    var_inc: f64,
-    var_decay: f64,
+    branching_heuristic: BranchingHeuristic,
+    // var_inc: f64,
+    // var_decay: f64,
     capture_drat: bool,
 }
 
@@ -21,8 +35,10 @@ pub struct SolverOptions {
 pub enum SolverOption {
     /// The clause activity decay factor.
     ClaDecay(f64),
+    /// The branching heuristic to be used.
+    BranchingHeuristic(BranchingHeuristic),
     /// The variable activity decay factor.
-    VarDecay(f64),
+    // VarDecay(f64),
     /// Should capture conflict clauses for drat output,
     CaptureDrat,
 }
@@ -32,8 +48,9 @@ impl Default for SolverOptions {
         SolverOptions {
             cla_inc: 1.0,
             cla_decay: 0.999,
-            var_inc: 1.0,
-            var_decay: 0.95,
+            branching_heuristic: BranchingHeuristic::Lrb,
+            // var_inc: 1.0,
+            // var_decay: 0.95,
             capture_drat: false,
         }
     }
@@ -44,7 +61,8 @@ impl SolverOptions {
     pub fn option(&mut self, option: SolverOption) {
         match option {
             SolverOption::ClaDecay(v) => self.cla_decay = v,
-            SolverOption::VarDecay(v) => self.var_decay = v,
+            // SolverOption::VarDecay(v) => self.var_decay = v,
+            SolverOption::BranchingHeuristic(bh) => self.branching_heuristic = bh,
             SolverOption::CaptureDrat => self.capture_drat = true,
         }
     }
@@ -87,7 +105,7 @@ impl Solver {
     pub fn new(options: SolverOptions) -> Self {
         Self {
             clause_db: ClauseDb::new(options.cla_inc, options.cla_decay),
-            var_manager: VarManager::new(options.var_inc, options.var_decay),
+            var_manager: VarManager::new(options.branching_heuristic),
             watches: vec![],
             prop_q: VecDeque::new(),
             trail: Trail::new(),
@@ -291,9 +309,7 @@ impl Solver {
                 self.watches[(!ps_1).index()].push(ci);
                 ci
             } else {
-                for p in &ps {
-                    self.var_manager.var_bump_activity(p.var());
-                }
+                self.var_manager.after_learnt_clause(&ps);
                 let ps_0 = ps[0];
                 let ps_1 = ps[1];
                 let ci = self.clause_db.add_learnt(Clause { lits: ps });
@@ -305,11 +321,6 @@ impl Solver {
 
             (true, Some(ci))
         }
-    }
-
-    fn decay_activities(&mut self) {
-        self.var_manager.var_decay_activity();
-        self.clause_db.cla_decay_activity();
     }
 
     /// Propagate unit clauses in prop_q and return when a confliting clause is found
@@ -479,7 +490,8 @@ impl Solver {
                         self.root_level
                     });
                     self.record(learnt_clause);
-                    self.decay_activities();
+                    self.var_manager.after_record_learnt_clause();
+                    self.clause_db.cla_decay_activity();
                 }
                 // No Conflict
                 None => {
