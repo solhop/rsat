@@ -23,15 +23,6 @@ pub struct VarManager {
     reason: Vec<Option<ClauseIndex>>,
     level: Vec<i32>,
     stats: InternalBranchStats,
-    // activity: Vec<f64>,
-    // var_inc: f64,
-    // var_decay: f64,
-    // alpha: f64,
-    // learnt_counter: usize,
-    // ema: Vec<f64>,
-    // assigned: Vec<usize>,
-    // participated: Vec<usize>,
-    // reasoned: Vec<usize>,
 }
 
 impl VarManager {
@@ -44,7 +35,7 @@ impl VarManager {
                 BranchingHeuristic::Vsids { var_inc, var_decay } => InternalBranchStats::Vsids {
                     activity: vec![],
                     var_inc,
-                    var_decay,
+                    var_decay: 1.0 / var_decay,
                 },
                 BranchingHeuristic::Lrb => InternalBranchStats::Lrb {
                     alpha: 0.4,
@@ -55,15 +46,6 @@ impl VarManager {
                     reasoned: vec![],
                 },
             },
-            // activity: vec![],
-            // var_inc,
-            // var_decay,
-            // alpha: 0.4,
-            // learnt_counter: 0,
-            // ema: vec![],
-            // assigned: vec![],
-            // participated: vec![],
-            // reasoned: vec![],
         }
     }
 
@@ -93,11 +75,6 @@ impl VarManager {
                 reasoned.push(0);
             }
         }
-        // self.activity.push(0.0);
-        // self.ema.push(0.0);
-        // self.assigned.push(0);
-        // self.participated.push(0);
-        // self.reasoned.push(0);
         v
     }
 
@@ -145,21 +122,6 @@ impl VarManager {
                 }
             }
         }
-        // self.learnt_counter += 1;
-        // for v in participating_variables {
-        //     self.participated[v.index()] += 1;
-        // }
-        // if self.alpha > 0.06 {
-        //     self.alpha -= 1e-6;
-        // }
-        // for v in reasoned_variables {
-        //     self.reasoned[v.index()] += 1;
-        // }
-        // for v in 0..self.n_vars() {
-        //     if self.assigns[v] == LBool::Undef {
-        //         self.ema[v] *= 0.95;
-        //     }
-        // }
     }
 
     pub fn select_var(&self) -> Var {
@@ -173,10 +135,6 @@ impl VarManager {
                 .max_by(|&x, &y| ema[x].partial_cmp(&ema[y]).unwrap())
                 .unwrap(),
         };
-        // let max_v = (0..self.n_vars())
-        //     .filter(|v| self.value(Var::new(*v)) == LBool::Undef)
-        //     .max_by(|&x, &y| self.ema[x].partial_cmp(&self.ema[y]).unwrap())
-        //     .unwrap();
         Var::new(max_v)
     }
 
@@ -185,6 +143,7 @@ impl VarManager {
             InternalBranchStats::Vsids {
                 activity, var_inc, ..
             } => {
+                // Increment activity of learnt clause
                 for p in ps {
                     let x = p.var();
                     activity[x.index()] += *var_inc;
@@ -198,49 +157,18 @@ impl VarManager {
             }
             InternalBranchStats::Lrb { .. } => {}
         }
-        // for p in ps {
-        // self.var_bump_activity(p.var());
-        // }
     }
 
     pub fn after_record_learnt_clause(&mut self) {
-        // self.var_decay_activity();
         match &mut self.stats {
             InternalBranchStats::Vsids {
                 var_inc, var_decay, ..
             } => {
+                // Decay activity of all variables
                 *var_inc *= *var_decay;
             }
             InternalBranchStats::Lrb { .. } => {}
         }
-    }
-
-    // fn var_bump_activity(&mut self, _x: Var) {
-    // self.activity[x.index()] += self.var_inc;
-    // if self.activity[x.index()] > 1e100 {
-    //     self.var_rescale_activity();
-    // }
-    // }
-
-    // fn var_decay_activity(&mut self) {
-    // self.var_inc *= self.var_decay;
-    // }
-
-    // pub fn var_rescale_activity(&mut self) {
-    // for i in 0..self.activity.len() {
-    //     self.activity[i] *= 1e-100;
-    // }
-    // self.var_inc *= 1e-100;
-    // }
-
-    pub fn update_var_decay(&mut self, var_decay_: f64) {
-        match &mut self.stats {
-            InternalBranchStats::Vsids { var_decay, .. } => {
-                *var_decay = var_decay_;
-            }
-            InternalBranchStats::Lrb { .. } => {}
-        }
-        // self.var_decay = var_decay;
     }
 
     pub fn get_reason(&self, var: Var) -> Option<ClauseIndex> {

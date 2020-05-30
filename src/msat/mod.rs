@@ -4,6 +4,7 @@ mod var_manager;
 
 use crate::*;
 use clause_db::{ClauseDb, ClauseIndex};
+use std::collections::HashSet;
 use std::collections::VecDeque;
 use trail::Trail;
 use var_manager::VarManager;
@@ -26,8 +27,6 @@ pub struct SolverOptions {
     cla_inc: f64,
     cla_decay: f64,
     branching_heuristic: BranchingHeuristic,
-    // var_inc: f64,
-    // var_decay: f64,
     capture_drat: bool,
 }
 
@@ -37,8 +36,6 @@ pub enum SolverOption {
     ClaDecay(f64),
     /// The branching heuristic to be used.
     BranchingHeuristic(BranchingHeuristic),
-    /// The variable activity decay factor.
-    // VarDecay(f64),
     /// Should capture conflict clauses for drat output,
     CaptureDrat,
 }
@@ -49,8 +46,6 @@ impl Default for SolverOptions {
             cla_inc: 1.0,
             cla_decay: 0.999,
             branching_heuristic: BranchingHeuristic::Lrb,
-            // var_inc: 1.0,
-            // var_decay: 0.95,
             capture_drat: false,
         }
     }
@@ -61,7 +56,6 @@ impl SolverOptions {
     pub fn option(&mut self, option: SolverOption) {
         match option {
             SolverOption::ClaDecay(v) => self.cla_decay = v,
-            // SolverOption::VarDecay(v) => self.var_decay = v,
             SolverOption::BranchingHeuristic(bh) => self.branching_heuristic = bh,
             SolverOption::CaptureDrat => self.capture_drat = true,
         }
@@ -368,7 +362,6 @@ impl Solver {
     }
 
     fn analyze(&mut self, cf: ClauseIndex) -> (Vec<Lit>, i32) {
-        use std::collections::HashSet;
         let mut participating_variables: HashSet<Var> = HashSet::new();
         let mut reason_variables: HashSet<Var> = HashSet::new();
 
@@ -464,15 +457,10 @@ impl Solver {
         }
     }
 
-    fn search(
-        &mut self,
-        nof_conflicts: u32,
-        nof_learnts: u32,
-        decay_params: (f64, f64),
-    ) -> (LBool, Vec<bool>) {
+    fn search(&mut self, nof_conflicts: u32, nof_learnts: u32) -> (LBool, Vec<bool>) {
+        let params = (0.95, 0.999);
         let mut conflit_count = 0;
-        self.var_manager.update_var_decay(1.0 / decay_params.0);
-        self.clause_db.update_cla_decay(1.0 / decay_params.1);
+        self.clause_db.update_cla_decay(1.0 / params.1);
 
         loop {
             let confl = self.propagate();
@@ -599,7 +587,6 @@ impl Solver {
     }
 
     fn solve_(&mut self, assumps: Vec<Lit>) -> Solution {
-        let params = (0.95, 0.999);
         let restart_first = 100.0;
         let restart_inc = 2.0f64;
         let mut nof_learnts: f64 = (self.n_clauses() as f64) / 3.0;
@@ -621,7 +608,7 @@ impl Solver {
         while status == LBool::Undef {
             let rest_base = restart_inc.powi(curr_restarts);
             let nof_conflicts = rest_base * restart_first;
-            let res = self.search(nof_conflicts as u32, nof_learnts as u32, params);
+            let res = self.search(nof_conflicts as u32, nof_learnts as u32);
             status = res.0;
             model = res.1;
             nof_learnts *= 1.1;
