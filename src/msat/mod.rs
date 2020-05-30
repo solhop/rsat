@@ -359,6 +359,7 @@ impl Solver {
     fn analyze(&mut self, cf: ClauseIndex) -> (Vec<Lit>, i32) {
         use std::collections::HashSet;
         let mut participating_variables: HashSet<Var> = HashSet::new();
+        let mut reason_variables: HashSet<Var> = HashSet::new();
 
         let mut confl = Some(cf);
         let mut seen = vec![false; self.n_vars()];
@@ -408,8 +409,19 @@ impl Solver {
         }
         out_learnt[0] = !(p.unwrap());
         participating_variables.insert(out_learnt[0].var());
+        for lit in out_learnt.iter() {
+            if let Some(ci) = self.var_manager.get_reason(lit.var()) {
+                let clause = self.clause_db.get_clause_ref(ci);
+                for lit in clause.lits.iter() {
+                    reason_variables.insert(lit.var());
+                }
+            }
+        }
+        for lit in out_learnt.iter() {
+            reason_variables.remove(&lit.var());
+        }
         self.var_manager
-            .after_conflict_analysis(participating_variables);
+            .after_conflict_analysis(participating_variables, reason_variables);
         (out_learnt, out_btlevel)
     }
 

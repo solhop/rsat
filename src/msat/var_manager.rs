@@ -13,6 +13,7 @@ pub struct VarManager {
     ema: Vec<f64>,
     assigned: Vec<usize>,
     participated: Vec<usize>,
+    reasoned: Vec<usize>,
 }
 
 impl VarManager {
@@ -29,6 +30,7 @@ impl VarManager {
             ema: vec![],
             assigned: vec![],
             participated: vec![],
+            reasoned: vec![],
         }
     }
 
@@ -45,6 +47,7 @@ impl VarManager {
         self.ema.push(0.0);
         self.assigned.push(0);
         self.participated.push(0);
+        self.reasoned.push(0);
         v
     }
 
@@ -63,6 +66,7 @@ impl VarManager {
     pub fn after_conflict_analysis(
         &mut self,
         participating_variables: std::collections::HashSet<Var>,
+        reasoned_variables: std::collections::HashSet<Var>,
     ) {
         self.learnt_counter += 1;
         for v in participating_variables {
@@ -70,6 +74,14 @@ impl VarManager {
         }
         if self.alpha > 0.06 {
             self.alpha -= 1e-6;
+        }
+        for v in reasoned_variables {
+            self.reasoned[v.index()] += 1;
+        }
+        for v in 0..self.n_vars() {
+            if self.assigns[v] == LBool::Undef {
+                self.ema[v] *= 0.95;
+            }
         }
     }
 
@@ -111,13 +123,16 @@ impl VarManager {
         if value != LBool::Undef {
             self.assigned[var.index()] = self.learnt_counter;
             self.participated[var.index()] = 0;
+            self.reasoned[var.index()] = 0;
         } else {
             let interval = self.learnt_counter - self.assigned[var.index()];
             if interval > 0 {
-                let r = self.participated[var.index()] as f64 / interval as f64;
-                let prev = self.ema[var.index()];
-                let next = (1.0 - self.alpha) * prev + self.alpha * r;
-                self.ema[var.index()] = next;
+                let interval = interval as f64;
+                let r = self.participated[var.index()] as f64 / interval;
+                let rsr = self.reasoned[var.index()] as f64 / interval;
+                let prev_ema = self.ema[var.index()];
+                let next_ema = (1.0 - self.alpha) * prev_ema + self.alpha * (r + rsr);
+                self.ema[var.index()] = next_ema;
             }
         }
         self.assigns[var.index()] = value;
