@@ -24,20 +24,14 @@ pub enum BranchingHeuristic {
 
 /// Solver options.
 pub struct SolverOptions {
-    cla_inc: f64,
-    cla_decay: f64,
-    branching_heuristic: BranchingHeuristic,
-    capture_drat: bool,
-}
-
-/// Different Solver Options.
-pub enum SolverOption {
-    /// The clause activity decay factor.
-    ClaDecay(f64),
-    /// The branching heuristic to be used.
-    BranchingHeuristic(BranchingHeuristic),
-    /// Should capture conflict clauses for drat output,
-    CaptureDrat,
+    /// Clause increment
+    pub cla_inc: f64,
+    /// Clause decay
+    pub cla_decay: f64,
+    /// Branching Heuristic
+    pub branching_heuristic: BranchingHeuristic,
+    /// Should capture drat clauses
+    pub capture_drat: bool,
 }
 
 impl Default for SolverOptions {
@@ -47,17 +41,6 @@ impl Default for SolverOptions {
             cla_decay: 0.999,
             branching_heuristic: BranchingHeuristic::Lrb,
             capture_drat: false,
-        }
-    }
-}
-
-impl SolverOptions {
-    /// Add solver option.
-    pub fn option(&mut self, option: SolverOption) {
-        match option {
-            SolverOption::ClaDecay(v) => self.cla_decay = v,
-            SolverOption::BranchingHeuristic(bh) => self.branching_heuristic = bh,
-            SolverOption::CaptureDrat => self.capture_drat = true,
         }
     }
 }
@@ -85,6 +68,7 @@ impl DratClauses {
 
 /// Represents a CDCL solver.
 pub struct Solver {
+    undef_state: bool,
     clause_db: ClauseDb,
     var_manager: VarManager,
     watches: Vec<Vec<ClauseIndex>>,
@@ -96,9 +80,9 @@ pub struct Solver {
 
 impl Solver {
     /// Create a new CDCL solver.
-    /// Set drat callback which takes (lits, is_delete)
     pub fn new(options: SolverOptions) -> Self {
         Self {
+            undef_state: false,
             clause_db: ClauseDb::new(options.cla_inc, options.cla_decay),
             var_manager: VarManager::new(options.branching_heuristic),
             watches: vec![],
@@ -115,7 +99,7 @@ impl Solver {
     }
 
     /// Returns the number of assigned variables in the formula.
-    pub fn n_assigns(&self) -> usize {
+    fn n_assigns(&self) -> usize {
         self.trail.n_assigns()
     }
 
@@ -135,7 +119,7 @@ impl Solver {
     }
 
     /// Returns the current decision level in the solver.
-    pub fn decision_level(&self) -> i32 {
+    fn decision_level(&self) -> i32 {
         self.trail.decision_level()
     }
 
@@ -146,14 +130,17 @@ impl Solver {
         self.var_manager.new_var()
     }
 
+    /// Add `n` new variables to the solver.
+    pub fn new_vars(&mut self, n: usize) -> Vec<Var> {
+        (0..n).map(|_| self.new_var()).collect()
+    }
+
     /// Add a new clause to the solver.
-    pub fn new_clause(&mut self, lits: Vec<Lit>) -> bool {
+    pub fn add_clause(&mut self, lits: Vec<Lit>) {
         let (r, _) = self.clause_new(lits, false);
         if !r {
-            // In case new clause returns false, formula is unsat and solver is in undef state
-            self.drat_clauses.capture(&vec![], false);
+            self.undef_state = true;
         }
-        r
     }
 
     /// Drat clauses
@@ -245,7 +232,7 @@ impl Solver {
             }
 
             // Remove all dups from ps
-            ps.sort_by(|l, m| l.0.partial_cmp(&m.0).unwrap());
+            ps.sort_by(|l, m| l.index().partial_cmp(&m.index()).unwrap());
             ps.dedup();
 
             // If both p and !p occurs in ps, return true
@@ -357,7 +344,7 @@ impl Solver {
         let mut counter = 0;
         let mut p = None;
 
-        let mut out_learnt = vec![Lit(0)]; // Change to asserting literal, later
+        let mut out_learnt = vec![UNDEF_LIT]; // Change to asserting literal, later
         let mut out_btlevel = 0;
         loop {
             debug_assert!(confl != None, "Conflit cannot be null");
@@ -530,6 +517,9 @@ impl Solver {
     }
 
     fn solve_(&mut self, assumps: Vec<Lit>) -> Solution {
+        if self.undef_state {
+            return Solution::Unsat;
+        }
         let restart_first = 100.0;
         let restart_inc = 2.0f64;
         let mut nof_learnts: f64 = (self.n_clauses() as f64) / 3.0;

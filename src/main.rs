@@ -28,7 +28,7 @@ struct Opt {
 }
 
 // Function to write drat clauses to file
-fn write_drat_clauses(drat: Option<File>, solver: rsat::msat::Solver) {
+fn write_drat_clauses(drat: Option<File>, solver: rsat::cdcl::Solver) {
     if let Some(mut drat_file) = drat {
         for (lits, is_delete) in solver.drat_clauses() {
             if is_delete {
@@ -66,17 +66,15 @@ fn main() {
                 panic!("Parallelism is not implemented for CDCL solver yet.");
             }
 
-            use rsat::msat::*;
+            use rsat::cdcl::*;
 
             let mut options = SolverOptions::default();
-            // options.option(SolverOption::BranchingHeuristic(
-            //     BranchingHeuristic::Vsids {
-            //         var_inc: 1.0,
-            //         var_decay: 0.95,
-            //     },
-            // ));
+            // options.branching_heuristic = BranchingHeuristic::Vsids {
+            //     var_inc: 1.0,
+            //     var_decay: 0.95,
+            // };
             if drat.is_some() {
-                options.option(SolverOption::CaptureDrat);
+                options.capture_drat = true;
             }
             let mut solver = Solver::new(options);
 
@@ -84,24 +82,12 @@ fn main() {
                 solver.new_var();
             }
 
-            let add_failed = {
-                let mut add_failed = false;
-                for i in 0..formula.n_clauses() {
-                    let c = formula.ith_clause(i);
-                    let r = solver.new_clause(c.lits.clone());
-                    if !r {
-                        add_failed = true;
-                        break;
-                    }
-                }
-                add_failed
-            };
+            for i in 0..formula.n_clauses() {
+                let c = formula.ith_clause(i);
+                solver.add_clause(c.lits.clone());
+            }
 
-            let solution = if add_failed {
-                Unsat
-            } else {
-                solver.solve(vec![])
-            };
+            let solution = solver.solve(vec![]);
 
             if let Unsat = solution {
                 write_drat_clauses(drat, solver);

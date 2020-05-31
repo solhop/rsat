@@ -52,7 +52,22 @@ impl Solver {
                 if let crate::parser::Dimacs::Cnf { n_vars, clauses } = parsed {
                     Ok(Solver {
                         num_vars: n_vars,
-                        clauses,
+                        clauses: clauses
+                            .into_iter()
+                            .map(|cl| Clause {
+                                lits: cl
+                                    .into_iter()
+                                    .map(|l| {
+                                        let var = Var::new((l.abs() - 1) as usize);
+                                        if l < 0 {
+                                            var.neg()
+                                        } else {
+                                            var.pos()
+                                        }
+                                    })
+                                    .collect(),
+                            })
+                            .collect(),
                     })
                 } else {
                     panic!("Incorrect input format");

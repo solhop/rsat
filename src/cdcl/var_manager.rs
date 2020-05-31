@@ -1,5 +1,5 @@
-use crate::msat::clause_db::ClauseIndex;
-use crate::msat::BranchingHeuristic;
+use crate::cdcl::clause_db::ClauseIndex;
+use crate::cdcl::BranchingHeuristic;
 use crate::*;
 
 enum InternalBranchStats {

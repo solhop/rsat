@@ -6,20 +6,32 @@ pub struct Var(usize);
 
 impl Var {
     /// Create new var
-    pub fn new(index: usize) -> Self {
+    pub(crate) fn new(index: usize) -> Self {
         Self(index)
     }
 
-    /// Returns the actual value stored inside
-    /// that can be used to index arrays.
+    /// Returns the actual value stored inside that can be used to index arrays.
     pub fn index(self) -> usize {
         self.0
+    }
+
+    /// Create positive literal from variable.
+    pub fn pos(self) -> Lit {
+        Lit::new(self, false)
+    }
+
+    /// Create negative literal from variable.
+    pub fn neg(self) -> Lit {
+        Lit::new(self, true)
     }
 }
 
 /// A literal.
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct Lit(pub usize);
+pub struct Lit(usize);
+
+/// Placeholder Lit
+pub const UNDEF_LIT: Lit = Lit(usize::MAX);
 
 impl Lit {
     /// Returns true if literal is signed (i.e. a negated literal).
@@ -32,9 +44,8 @@ impl Lit {
         Var(self.0 >> 1)
     }
 
-    /// Returns the actual value stored inside
-    /// that can be used to index arrays.
-    pub fn index(self) -> usize {
+    /// Returns the actual value stored inside that can be used to index arrays.
+    pub(crate) fn index(self) -> usize {
         self.0
     }
 
@@ -97,7 +108,7 @@ pub struct Clause {
 }
 
 /// Solution to the SAT Formula.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Solution {
     /// The formula is unsatisfiable.
     Unsat,

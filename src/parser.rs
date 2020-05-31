@@ -1,5 +1,4 @@
 use crate::errors::*;
-use crate::*;
 use regex::Regex;
 use std::io::BufRead;
 
@@ -10,14 +9,14 @@ pub enum Dimacs {
         /// Number of variables.
         n_vars: usize,
         /// Clauses.
-        clauses: Vec<Clause>,
+        clauses: Vec<Vec<i32>>,
     },
     /// Weighted formula.
     Wcnf {
         /// Number of variables.
         n_vars: usize,
         /// Clauses with their weights.
-        clauses: Vec<(Clause, u64)>,
+        clauses: Vec<(Vec<i32>, u64)>,
         /// Weight corresponding to hard clause.
         hard_weight: u64,
     },
@@ -68,12 +67,12 @@ where
                     0 => continue,
                     n => n,
                 };
-                let sign = if l < 0 { 1 } else { 0 };
-                let var = (l.abs() - 1) as usize;
-                let l = 2 * var + sign;
-                cl.push(Lit(l));
+                // let sign = if l < 0 { 1 } else { 0 };
+                // let var = (l.abs() - 1) as usize;
+                // let l = 2 * var + sign;
+                cl.push(l);
             }
-            clauses.push(Clause { lits: cl });
+            clauses.push(cl);
             weights.push(weight);
             if clauses.len() == n_clauses {
                 break;
