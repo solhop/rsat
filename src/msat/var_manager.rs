@@ -92,7 +92,7 @@ impl VarManager {
 
     pub fn after_conflict_analysis(
         &mut self,
-        participating_variables: std::collections::HashSet<Var>,
+        participating_variables: Vec<Var>,
         reasoned_variables: std::collections::HashSet<Var>,
     ) {
         match &mut self.stats {

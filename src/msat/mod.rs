@@ -134,11 +134,6 @@ impl Solver {
         self.var_manager.value(x)
     }
 
-    /// Returns the value of the literal under current partial assignment.
-    pub fn value_lit(&self, p: Lit) -> LBool {
-        self.var_manager.value_lit(p)
-    }
-
     /// Returns the current decision level in the solver.
     pub fn decision_level(&self) -> i32 {
         self.trail.decision_level()
@@ -212,9 +207,9 @@ impl Solver {
         let cl = self.clause_db.get_clause_ref(ci);
         let mut lits = cl.lits.clone();
         for i in 0..lits.len() {
-            if self.value_lit(lits[i]) == LBool::True {
+            if self.var_manager.value_lit(lits[i]) == LBool::True {
                 return true;
-            } else if self.value_lit(lits[i]) == LBool::Undef {
+            } else if self.var_manager.value_lit(lits[i]) == LBool::Undef {
                 lits[j] = lits[i];
                 j += 1;
             }
@@ -233,7 +228,7 @@ impl Solver {
         let mut reason = vec![];
         for i in (if p == None { 0 } else { 1 })..cl.lits.len() {
             // Inv: self.value_lit(lits[i]) == FALSE
-            debug_assert!(self.value_lit(cl.lits[i]) == LBool::False);
+            debug_assert!(self.var_manager.value_lit(cl.lits[i]) == LBool::False);
             reason.push(!cl.lits[i]);
         }
         self.clause_db.found_clause_as_reason(ci);
@@ -244,7 +239,7 @@ impl Solver {
         if !learnt {
             // If any lit in ps is true, return true
             for &l in ps.iter() {
-                if self.value_lit(l) == LBool::True {
+                if self.var_manager.value_lit(l) == LBool::True {
                     return (true, None);
                 }
             }
@@ -264,7 +259,7 @@ impl Solver {
             ps = ps
                 .iter()
                 .copied()
-                .filter(|&l| self.value_lit(l) == LBool::Undef)
+                .filter(|&l| self.var_manager.value_lit(l) == LBool::Undef)
                 .collect();
         }
 
@@ -342,8 +337,8 @@ impl Solver {
     }
 
     fn enqueue(&mut self, p: Lit, from: Option<ClauseIndex>) -> bool {
-        if self.value_lit(p) != LBool::Undef {
-            !(self.value_lit(p) == LBool::False)
+        if self.var_manager.value_lit(p) != LBool::Undef {
+            !(self.var_manager.value_lit(p) == LBool::False)
         } else {
             self.var_manager
                 .update(p.var(), LBool::from(!p.sign()), self.decision_level(), from);
@@ -354,7 +349,7 @@ impl Solver {
     }
 
     fn analyze(&mut self, cf: ClauseIndex) -> (Vec<Lit>, i32) {
-        let mut participating_variables: HashSet<Var> = HashSet::new();
+        let mut participating_variables: Vec<Var> = vec![];
         let mut reason_variables: HashSet<Var> = HashSet::new();
 
         let mut confl = Some(cf);
@@ -371,8 +366,8 @@ impl Solver {
 
             // Trace reason for p
             for q in p_reason {
-                participating_variables.insert(q.var());
                 if !seen[q.var().index()] {
+                    participating_variables.push(q.var());
                     seen[q.var().index()] = true;
                     if self.var_manager.get_level(q.var()) == self.decision_level() {
                         counter += 1;
@@ -404,7 +399,9 @@ impl Solver {
             }
         }
         out_learnt[0] = !(p.unwrap());
-        participating_variables.insert(out_learnt[0].var());
+        if !seen[out_learnt[0].var().index()] {
+            participating_variables.push(out_learnt[0].var());
+        }
         for lit in out_learnt.iter() {
             if let Some(ci) = self.var_manager.get_reason(lit.var()) {
                 let clause = self.clause_db.get_clause_ref(ci);
