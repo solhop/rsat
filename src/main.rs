@@ -1,4 +1,7 @@
+use rsat::cdcl;
+use rsat::Var;
 use std::fs::File;
+use std::io;
 use std::io::Write;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -27,6 +30,17 @@ struct Opt {
     drat: Option<PathBuf>,
 }
 
+fn parse_from_file(filename: &str) -> (usize, Vec<Vec<i32>>) {
+    let file = File::open(filename).expect("File not found");
+    let mut reader = io::BufReader::new(file);
+    let parsed = rsat::parser::parse_dimacs_from_buf_reader(&mut reader);
+    if let rsat::parser::Dimacs::Cnf { n_vars, clauses } = parsed {
+        (n_vars, clauses)
+    } else {
+        panic!("Incorrect input format");
+    }
+}
+
 // Function to write drat clauses to file
 fn write_drat_clauses(drat: Option<File>, solver: rsat::cdcl::Solver) {
     if let Some(mut drat_file) = drat {
@@ -53,11 +67,7 @@ fn write_drat_clauses(drat: Option<File>, solver: rsat::cdcl::Solver) {
 
 fn main() {
     let opt = Opt::from_args();
-    let mut formula = rsat::sls::Solver::new_from_file(opt.file.to_str().unwrap());
-    let drat = match opt.drat {
-        Some(drat) => Some(File::create(drat).expect("Drat file not found")),
-        None => None,
-    };
+    let (n_vars, clauses) = parse_from_file(opt.file.to_str().unwrap());
 
     use rsat::Solution::*;
     let solution = match opt.alg {
@@ -66,25 +76,37 @@ fn main() {
                 panic!("Parallelism is not implemented for CDCL solver yet.");
             }
 
-            use rsat::cdcl::*;
+            use cdcl::*;
 
             let mut options = SolverOptions::default();
             // options.branching_heuristic = BranchingHeuristic::Vsids {
             //     var_inc: 1.0,
             //     var_decay: 0.95,
             // };
+            let drat = match opt.drat {
+                Some(drat) => Some(File::create(drat).expect("Drat file not found")),
+                None => None,
+            };
             if drat.is_some() {
                 options.capture_drat = true;
             }
             let mut solver = Solver::new(options);
 
-            for _ in 0..formula.n_vars() {
-                solver.new_var();
-            }
+            let vars: Vec<Var> = (0..n_vars).map(|_| solver.new_var()).collect();
 
-            for i in 0..formula.n_clauses() {
-                let c = formula.ith_clause(i);
-                solver.add_clause(c.lits.clone());
+            for clause in clauses {
+                let lits = clause
+                    .into_iter()
+                    .map(|l| {
+                        let var = vars[(l.abs() - 1) as usize];
+                        if l < 0 {
+                            var.neg_lit()
+                        } else {
+                            var.pos_lit()
+                        }
+                    })
+                    .collect();
+                solver.add_clause(lits);
             }
 
             let solution = solver.solve(vec![]);
@@ -94,12 +116,15 @@ fn main() {
             }
             solution
         }
-        2 => formula.local_search(
-            opt.max_tries,
-            opt.max_flips,
-            rsat::sls::ScoreFnType::Exp,
-            opt.parallel,
-        ),
+        2 => {
+            let mut solver = rsat::sls::Solver::new_from_file(opt.file.to_str().unwrap());
+            solver.local_search(
+                opt.max_tries,
+                opt.max_flips,
+                rsat::sls::ScoreFnType::Exp,
+                opt.parallel,
+            )
+        }
         _ => panic!("Invalid algorithm"),
     };
     match solution {
@@ -115,9 +140,6 @@ fn main() {
             println!("0");
         }
         Sat(solution) => {
-            if !formula.verify(&solution) {
-                panic!("Solver gave incorrect model");
-            }
             println!("s SATISFIABLE");
             print!("v ");
             let solution = solution.iter().map(|&x| if x { 1 } else { -1 });

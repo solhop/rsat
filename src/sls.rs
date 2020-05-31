@@ -81,11 +81,6 @@ impl Solver {
         self.clauses.len()
     }
 
-    /// Return's ith clause
-    pub fn ith_clause(&self, i: usize) -> &Clause {
-        &self.clauses[i]
-    }
-
     /// Add a clause to the formula.
     pub fn add_clause(&mut self, lits: Vec<Lit>) {
         self.clauses.push(Clause { lits });
@@ -254,24 +249,5 @@ impl Solver {
                 LBool::False => *v = false,
             }
         }
-    }
-
-    /// Verify that the clauses are satisfied by the input model.
-    pub fn verify(&self, model: &[bool]) -> bool {
-        // println!("c Verifying solution");
-        for Clause { lits: cl } in self.clauses.iter() {
-            let mut cla_sat = false;
-            for &lit in cl.iter() {
-                let var = lit.var();
-                if lit.sign() != model[var.index()] {
-                    cla_sat = true;
-                    break;
-                }
-            }
-            if !cla_sat {
-                return false;
-            }
-        }
-        true
     }
 }

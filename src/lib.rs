@@ -1,6 +1,6 @@
 //! `rsat` is a SAT Solver.
 //!
-//! ## An example using the SLS solver
+//! ## An example using the CDCL solver
 //!
 //! ```rust
 //! use rsat::cdcl::{Solver, SolverOptions};
@@ -33,7 +33,7 @@ pub use common::*;
 /// DIMACS Parser.
 pub mod parser;
 
-/// sls, a local search solver module.
+/// Stochastic local search solver module.
 pub mod sls;
 
 /// CDCL solver module.

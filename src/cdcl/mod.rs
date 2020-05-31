@@ -9,7 +9,7 @@ use std::collections::VecDeque;
 use trail::Trail;
 use var_manager::VarManager;
 
-/// Branching heuristic to be used for msat
+/// Branching heuristic to be used for cdcl
 pub enum BranchingHeuristic {
     /// VSIDS
     Vsids {
