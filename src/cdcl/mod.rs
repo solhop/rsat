@@ -59,9 +59,9 @@ impl DratClauses {
         }
     }
 
-    fn capture(&mut self, lits: &Vec<Lit>, is_delete: bool) {
+    fn capture(&mut self, lits: &[Lit], is_delete: bool) {
         if self.capture_drat {
-            self.drat_clauses.push((lits.clone(), is_delete));
+            self.drat_clauses.push((Vec::from(lits), is_delete));
         }
     }
 }
@@ -511,7 +511,7 @@ impl Solver {
     pub fn solve(&mut self, assumps: Vec<Lit>) -> Solution {
         let solution = self.solve_(assumps);
         if let Solution::Unsat = solution {
-            self.drat_clauses.capture(&vec![], false);
+            self.drat_clauses.capture(&[], false);
         }
         solution
     }

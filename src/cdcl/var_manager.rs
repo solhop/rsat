@@ -115,9 +115,9 @@ impl VarManager {
                 for v in reasoned_variables {
                     reasoned[v.index()] += 1;
                 }
-                for v in 0..self.assigns.len() {
-                    if self.assigns[v] == LBool::Undef {
-                        ema[v] *= 0.95;
+                for (index, value) in ema.iter_mut().enumerate() {
+                    if self.assigns[index] == LBool::Undef {
+                        *value *= 0.95;
                     }
                 }
             }
@@ -138,7 +138,7 @@ impl VarManager {
         Var::new(max_v)
     }
 
-    pub fn after_learnt_clause(&mut self, ps: &Vec<Lit>) {
+    pub fn after_learnt_clause(&mut self, ps: &[Lit]) {
         match &mut self.stats {
             InternalBranchStats::Vsids {
                 activity, var_inc, ..
@@ -148,8 +148,8 @@ impl VarManager {
                     let x = p.var();
                     activity[x.index()] += *var_inc;
                     if activity[x.index()] > 1e100 {
-                        for i in 0..activity.len() {
-                            activity[i] *= 1e-100;
+                        for act in activity.iter_mut() {
+                            *act *= 1e-100;
                         }
                         *var_inc *= 1e-100;
                     }

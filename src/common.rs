@@ -16,12 +16,12 @@ impl Var {
     }
 
     /// Create positive literal from variable.
-    pub fn pos(self) -> Lit {
+    pub fn pos_lit(self) -> Lit {
         Lit::new(self, false)
     }
 
     /// Create negative literal from variable.
-    pub fn neg(self) -> Lit {
+    pub fn neg_lit(self) -> Lit {
         Lit::new(self, true)
     }
 }
@@ -118,14 +118,4 @@ pub enum Solution {
     Sat(Vec<bool>),
     /// No solution could be found.
     Unknown,
-}
-
-/// Errors module.
-#[allow(missing_docs)]
-pub mod errors {
-    error_chain::error_chain! {
-        foreign_links {
-            ParseIntError(std::num::ParseIntError);
-        }
-    }
 }

@@ -53,7 +53,7 @@ fn write_drat_clauses(drat: Option<File>, solver: rsat::cdcl::Solver) {
 
 fn main() {
     let opt = Opt::from_args();
-    let mut formula = rsat::sls::Solver::new_from_file(opt.file.to_str().unwrap()).unwrap();
+    let mut formula = rsat::sls::Solver::new_from_file(opt.file.to_str().unwrap());
     let drat = match opt.drat {
         Some(drat) => Some(File::create(drat).expect("Drat file not found")),
         None => None,

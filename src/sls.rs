@@ -1,4 +1,3 @@
-use crate::errors::*;
 use crate::*;
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
@@ -30,50 +29,45 @@ pub struct Solver {
 
 impl Solver {
     /// Read formula in DIMACS format from STDIN.
-    pub fn new_from_stdin() -> Result<Self> {
+    pub fn new_from_stdin() -> Self {
         Solver::new_from_buf_reader(&mut std::io::stdin().lock())
     }
 
     /// Read formula in DIMACS format from a file.
-    pub fn new_from_file(filename: &str) -> Result<Self> {
+    pub fn new_from_file(filename: &str) -> Self {
         let file = File::open(filename).expect("File not found");
         let mut reader = io::BufReader::new(file);
         Solver::new_from_buf_reader(&mut reader)
     }
 
     /// Read formula in DIMACS format from buffer reader.
-    pub fn new_from_buf_reader<F>(reader: &mut F) -> Result<Self>
+    pub fn new_from_buf_reader<F>(reader: &mut F) -> Self
     where
         F: std::io::BufRead,
     {
         let parsed = crate::parser::parse_dimacs_from_buf_reader(reader);
-        match parsed {
-            Ok(parsed) => {
-                if let crate::parser::Dimacs::Cnf { n_vars, clauses } = parsed {
-                    Ok(Solver {
-                        num_vars: n_vars,
-                        clauses: clauses
+        if let crate::parser::Dimacs::Cnf { n_vars, clauses } = parsed {
+            Solver {
+                num_vars: n_vars,
+                clauses: clauses
+                    .into_iter()
+                    .map(|cl| Clause {
+                        lits: cl
                             .into_iter()
-                            .map(|cl| Clause {
-                                lits: cl
-                                    .into_iter()
-                                    .map(|l| {
-                                        let var = Var::new((l.abs() - 1) as usize);
-                                        if l < 0 {
-                                            var.neg()
-                                        } else {
-                                            var.pos()
-                                        }
-                                    })
-                                    .collect(),
+                            .map(|l| {
+                                let var = Var::new((l.abs() - 1) as usize);
+                                if l < 0 {
+                                    var.neg_lit()
+                                } else {
+                                    var.pos_lit()
+                                }
                             })
                             .collect(),
                     })
-                } else {
-                    panic!("Incorrect input format");
-                }
+                    .collect(),
             }
-            Err(e) => Err(e),
+        } else {
+            panic!("Incorrect input format");
         }
     }
 

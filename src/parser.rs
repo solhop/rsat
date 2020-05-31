@@ -1,4 +1,3 @@
-use crate::errors::*;
 use regex::Regex;
 use std::io::BufRead;
 
@@ -23,7 +22,7 @@ pub enum Dimacs {
 }
 
 /// Parse dimacs from buffer reader.
-pub fn parse_dimacs_from_buf_reader<F>(reader: &mut F) -> Result<Dimacs>
+pub fn parse_dimacs_from_buf_reader<F>(reader: &mut F) -> Dimacs
 where
     F: std::io::BufRead,
 {
@@ -46,13 +45,13 @@ where
             let re_cnf = Regex::new(r"p\s+cnf\s+(\d+)\s+(\d+)").unwrap();
             let re_wcnf = Regex::new(r"p\s+wcnf\s+(\d+)\s+(\d+)\s+(\d+)").unwrap();
             if let Some(cap) = re_cnf.captures(&line) {
-                n_vars = cap[1].parse()?;
-                n_clauses = cap[2].parse()?;
+                n_vars = cap[1].parse().unwrap();
+                n_clauses = cap[2].parse().unwrap();
             } else if let Some(cap) = re_wcnf.captures(&line) {
                 is_wcnf = true;
-                n_vars = cap[1].parse()?;
-                n_clauses = cap[2].parse()?;
-                hard_weight = cap[3].parse()?;
+                n_vars = cap[1].parse().unwrap();
+                n_clauses = cap[2].parse().unwrap();
+                hard_weight = cap[3].parse().unwrap();
             }
         } else {
             let re = Regex::new(r"(-?\d+)").unwrap();
@@ -60,10 +59,10 @@ where
             let mut weight = 0u64;
             for (i, cap) in re.captures_iter(&line).enumerate() {
                 if i == 0 && is_wcnf {
-                    weight = cap[1].parse::<u64>()?;
+                    weight = cap[1].parse::<u64>().unwrap();
                     continue;
                 }
-                let l = match cap[1].parse::<i32>()? {
+                let l = match cap[1].parse::<i32>().unwrap() {
                     0 => continue,
                     n => n,
                 };
@@ -80,7 +79,7 @@ where
         }
     }
 
-    Ok(if is_wcnf {
+    if is_wcnf {
         Dimacs::Wcnf {
             n_vars,
             clauses: clauses.into_iter().zip(weights).collect(),
@@ -88,5 +87,5 @@ where
         }
     } else {
         Dimacs::Cnf { n_vars, clauses }
-    })
+    }
 }
