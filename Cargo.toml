@@ -4,10 +4,10 @@ version = "0.1.11"
 authors = ["Prateek Kumar <prateek@prateekkumar.in>"]
 edition = "2018"
 description = """
-SolHOP SAT Solver
+SAT Solver
 """
 documentation = "https://docs.rs/rsat/"
-homepage = "https://docs.rs/crate/rsat/"
+homepage = "https://solhop.org/tools/rsat"
 repository = "https://github.com/solhop/rsat"
 readme = "README.md"
 keywords = ["SAT", "Boolean", "Satisfiability", "Solver", "Math"]

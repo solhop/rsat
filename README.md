@@ -1,6 +1,6 @@
 # rsat
 
-SolHop SAT Solver.
+SAT Solver.
 
 [![Crates.io](https://img.shields.io/crates/v/rsat.svg?style=for-the-badge)](https://crates.io/crates/rsat)
 [![Crates.io](https://img.shields.io/crates/d/rsat.svg?style=for-the-badge)](https://crates.io/crates/rsat)
@@ -11,7 +11,7 @@ Currently, a stochastic local search based on probSAT and a CDCL solver based on
 More algorithms will be available soon.
 
 This projetct is still in development.
-The APIs can change a lot before the first stable release v1.0.0.
+The APIs can change before the first stable release v1.0.0.
 
 ## License
 
