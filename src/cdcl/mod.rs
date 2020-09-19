@@ -1,70 +1,17 @@
 mod clause_db;
+mod drat_clauses;
+mod solver_options;
 mod trail;
 mod var_manager;
 
 use crate::*;
 use clause_db::{ClauseDb, ClauseIndex};
+use drat_clauses::DratClauses;
+pub use solver_options::{BranchingHeuristic, ClauseDbOptions, SolverOptions};
 use std::collections::HashSet;
 use std::collections::VecDeque;
 use trail::Trail;
 use var_manager::VarManager;
-
-/// Branching heuristic to be used for cdcl
-pub enum BranchingHeuristic {
-    /// VSIDS
-    Vsids {
-        /// Var increment
-        var_inc: f64,
-        ///Var decay
-        var_decay: f64,
-    },
-    /// LRB
-    Lrb,
-}
-
-/// Solver options.
-pub struct SolverOptions {
-    /// Clause increment
-    pub cla_inc: f64,
-    /// Clause decay
-    pub cla_decay: f64,
-    /// Branching Heuristic
-    pub branching_heuristic: BranchingHeuristic,
-    /// Should capture drat clauses
-    pub capture_drat: bool,
-}
-
-impl Default for SolverOptions {
-    fn default() -> Self {
-        SolverOptions {
-            cla_inc: 1.0,
-            cla_decay: 0.999,
-            branching_heuristic: BranchingHeuristic::Lrb,
-            capture_drat: false,
-        }
-    }
-}
-
-/// Storage for drat clauses
-pub(crate) struct DratClauses {
-    drat_clauses: Vec<(Vec<Lit>, bool)>,
-    capture_drat: bool,
-}
-
-impl DratClauses {
-    fn new(capture_drat: bool) -> Self {
-        Self {
-            drat_clauses: vec![],
-            capture_drat,
-        }
-    }
-
-    fn capture(&mut self, lits: &[Lit], is_delete: bool) {
-        if self.capture_drat {
-            self.drat_clauses.push((Vec::from(lits), is_delete));
-        }
-    }
-}
 
 /// Represents a CDCL solver.
 pub struct Solver {
@@ -76,20 +23,24 @@ pub struct Solver {
     trail: Trail,
     root_level: i32,
     drat_clauses: DratClauses,
+    options: SolverOptions,
 }
 
 impl Solver {
     /// Create a new CDCL solver.
     pub fn new(options: SolverOptions) -> Self {
+        let clause_db = ClauseDb::new(options.clause_db_options);
+        let var_manager = VarManager::new(options.branching_heuristic);
         Self {
             undef_state: false,
-            clause_db: ClauseDb::new(options.cla_inc, options.cla_decay),
-            var_manager: VarManager::new(options.branching_heuristic),
+            clause_db,
+            var_manager,
             watches: vec![],
             prop_q: VecDeque::new(),
             trail: Trail::new(),
             root_level: 0,
             drat_clauses: DratClauses::new(options.capture_drat),
+            options,
         }
     }
 
@@ -145,7 +96,7 @@ impl Solver {
 
     /// Drat clauses
     pub fn drat_clauses(self) -> Vec<(Vec<Lit>, bool)> {
-        if self.drat_clauses.capture_drat {
+        if self.options.capture_drat {
             self.drat_clauses.drat_clauses
         } else {
             vec![]

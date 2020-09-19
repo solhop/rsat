@@ -1,3 +1,4 @@
+use super::solver_options::ClauseDbOptions;
 use super::{DratClauses, VarManager};
 use crate::*;
 use std::collections::HashMap;
@@ -17,13 +18,13 @@ pub struct ClauseDb {
 }
 
 impl ClauseDb {
-    pub fn new(cla_inc: f64, cla_decay: f64) -> Self {
+    pub fn new(options: ClauseDbOptions) -> Self {
         ClauseDb {
             original: vec![],
             learnts: HashMap::new(),
             curr_learnt_id: 0,
-            cla_inc,
-            cla_decay: 1.0 / cla_decay,
+            cla_inc: options.cla_inc,
+            cla_decay: 1.0 / options.cla_decay,
         }
     }
 
