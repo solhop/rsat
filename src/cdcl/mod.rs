@@ -5,7 +5,7 @@ mod trail;
 mod var_manager;
 
 use crate::*;
-use clause_db::{ClauseDb, ClauseIndex};
+use clause_db::{ClauseDb, ClauseRef};
 use drat_clauses::DratClauses;
 pub use solver_options::{BranchingHeuristic, ClauseDbOptions, SolverOptions};
 use std::collections::HashSet;
@@ -18,7 +18,7 @@ pub struct Solver {
     undef_state: bool,
     clause_db: ClauseDb,
     var_manager: VarManager,
-    watches: Vec<Vec<ClauseIndex>>,
+    watches: Vec<Vec<ClauseRef>>,
     prop_q: VecDeque<Lit>,
     trail: Trail,
     root_level: i32,
@@ -104,10 +104,13 @@ impl Solver {
     }
 
     /// Assume p is true and simplify the clause
-    fn clause_propagate(&mut self, ci: ClauseIndex, p: Lit) -> bool {
+    fn clause_propagate(&mut self, ci: ClauseRef, p: Lit) -> bool {
         let clause = match ci {
-            ClauseIndex::Orig(index) => self.clause_db.get_original_mut(index).unwrap(),
-            ClauseIndex::Lrnt(index) => self.clause_db.get_learnt_mut(index).unwrap(),
+            ClauseRef::Orig(index) => self.clause_db.get_original_mut(index).unwrap(),
+            ClauseRef::Lrnt(clause_ref) => {
+                // self.clause_db.get_learnt_mut(index).unwrap();
+                &mut clause_ref.upgrade().unwrap().borrow_mut().0
+            }
         };
 
         // Make sure false lit at cl.lits[1]
@@ -140,9 +143,9 @@ impl Solver {
     }
 
     // Only called at top level with empty prop queue
-    fn clause_simplify(&mut self, ci: ClauseIndex) -> bool {
+    fn clause_simplify(&mut self, ci: ClauseRef) -> bool {
         let mut j = 0;
-        let cl = self.clause_db.get_clause_ref(ci);
+        let cl = self.clause_db.get_clause_ref(ci).unwrap();
         let mut lits = cl.lits.clone();
         for i in 0..lits.len() {
             if self.var_manager.value_lit(lits[i]) == LBool::True {
@@ -155,13 +158,13 @@ impl Solver {
         while lits.len() != j {
             lits.pop();
         }
-        self.clause_db.get_clause_mut_ref(ci).lits = lits;
+        self.clause_db.get_clause_mut_ref(ci).unwrap().lits = lits;
         false
     }
 
-    fn clause_calc_reason(&mut self, ci: ClauseIndex, p: Option<Lit>) -> Vec<Lit> {
+    fn clause_calc_reason(&mut self, ci: ClauseRef, p: Option<Lit>) -> Vec<Lit> {
         // Inv: p == None or p == cl.Lits[0]
-        let cl = self.clause_db.get_clause_ref(ci);
+        let cl = self.clause_db.get_clause_ref(ci).unwrap();
         debug_assert!(p == None || p == Some(cl.lits[0]));
         let mut reason = vec![];
         for i in (if p == None { 0 } else { 1 })..cl.lits.len() {
@@ -173,7 +176,7 @@ impl Solver {
         reason
     }
 
-    fn clause_new(&mut self, mut ps: Vec<Lit>, learnt: bool) -> (bool, Option<ClauseIndex>) {
+    fn clause_new(&mut self, mut ps: Vec<Lit>, learnt: bool) -> (bool, Option<ClauseRef>) {
         if !learnt {
             // If any lit in ps is true, return true
             for &l in ps.iter() {
@@ -243,7 +246,7 @@ impl Solver {
     }
 
     /// Propagate unit clauses in prop_q and return when a confliting clause is found
-    fn propagate(&mut self) -> Option<ClauseIndex> {
+    fn propagate(&mut self) -> Option<ClauseRef> {
         while !self.prop_q.is_empty() {
             let p = self.prop_q.pop_back().unwrap();
             let tmp = self.watches[p.index()].clone();
@@ -274,7 +277,7 @@ impl Solver {
         None
     }
 
-    fn enqueue(&mut self, p: Lit, from: Option<ClauseIndex>) -> bool {
+    fn enqueue(&mut self, p: Lit, from: Option<ClauseRef>) -> bool {
         if self.var_manager.value_lit(p) != LBool::Undef {
             !(self.var_manager.value_lit(p) == LBool::False)
         } else {
@@ -286,7 +289,7 @@ impl Solver {
         }
     }
 
-    fn analyze(&mut self, cf: ClauseIndex) -> (Vec<Lit>, i32) {
+    fn analyze(&mut self, cf: ClauseRef) -> (Vec<Lit>, i32) {
         let mut participating_variables: Vec<Var> = vec![];
         let mut reason_variables: HashSet<Var> = HashSet::new();
 
@@ -342,7 +345,7 @@ impl Solver {
         }
         for lit in out_learnt.iter() {
             if let Some(ci) = self.var_manager.get_reason(lit.var()) {
-                let clause = self.clause_db.get_clause_ref(ci);
+                let clause = self.clause_db.get_clause_ref(ci).unwrap();
                 for lit in clause.lits.iter() {
                     reason_variables.insert(lit.var());
                 }
@@ -449,10 +452,10 @@ impl Solver {
         }
 
         let cls = self.clause_db.learnt_indices();
-        for i in cls {
-            if self.clause_simplify(ClauseIndex::Lrnt(i)) {
+        for cl_ref in cls {
+            if self.clause_simplify(ClauseRef::Lrnt(cl_ref)) {
                 self.clause_db
-                    .remove_learnt(i, &mut self.watches, &mut self.drat_clauses);
+                    .remove_learnt(cl_ref, &mut self.watches, &mut self.drat_clauses);
             }
         }
         true

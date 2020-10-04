@@ -1,4 +1,4 @@
-use crate::cdcl::clause_db::ClauseIndex;
+use crate::cdcl::clause_db::ClauseRef;
 use crate::cdcl::BranchingHeuristic;
 use crate::*;
 
@@ -20,7 +20,7 @@ enum InternalBranchStats {
 
 pub struct VarManager {
     assigns: Vec<LBool>,
-    reason: Vec<Option<ClauseIndex>>,
+    reason: Vec<Option<ClauseRef>>,
     level: Vec<i32>,
     stats: InternalBranchStats,
 }
@@ -171,11 +171,11 @@ impl VarManager {
         }
     }
 
-    pub fn get_reason(&self, var: Var) -> Option<ClauseIndex> {
-        self.reason[var.index()]
+    pub fn get_reason(&self, var: Var) -> Option<ClauseRef> {
+        self.reason[var.index()].clone()
     }
 
-    pub fn update(&mut self, var: Var, value: LBool, level: i32, reason: Option<ClauseIndex>) {
+    pub fn update(&mut self, var: Var, value: LBool, level: i32, reason: Option<ClauseRef>) {
         match &mut self.stats {
             InternalBranchStats::Vsids { .. } => {}
             InternalBranchStats::Lrb {
