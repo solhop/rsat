@@ -31,7 +31,7 @@ impl Var {
 pub struct Lit(usize);
 
 /// Placeholder Lit
-pub const UNDEF_LIT: Lit = Lit(usize::MAX);
+pub(crate) const UNDEF_LIT: Lit = Lit(usize::MAX);
 
 impl Lit {
     /// Returns true if literal is signed (i.e. a negated literal).

@@ -1,4 +1,4 @@
-use crate::*;
+use crate::common::Lit;
 
 #[derive(Debug)]
 pub struct Trail {

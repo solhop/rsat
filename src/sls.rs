@@ -1,4 +1,4 @@
-use crate::*;
+use crate::common::{Clause, LBool, Lit, Solution, Var};
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rayon::prelude::*;

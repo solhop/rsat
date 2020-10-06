@@ -4,7 +4,7 @@
 //!
 //! ```rust
 //! use rsat::cdcl::{Solver, SolverOptions};
-//! use rsat::{Var, Solution};
+//! use rsat::common::{Var, Solution};
 //!
 //! let options = SolverOptions::default();
 //! let mut solver = Solver::new(options);
@@ -26,9 +26,7 @@
 #![deny(missing_docs)]
 
 /// Common utils.
-mod common;
-
-pub use common::*;
+pub mod common;
 
 /// DIMACS Parser.
 pub mod parser;

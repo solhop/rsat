@@ -1,6 +1,6 @@
+use super::solver_options::BranchingHeuristic;
 use crate::cdcl::clause_db::ClauseIndex;
-use crate::cdcl::BranchingHeuristic;
-use crate::*;
+use crate::common::{LBool, Lit, Var};
 
 enum InternalBranchStats {
     Vsids {

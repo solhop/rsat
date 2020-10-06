@@ -1,5 +1,5 @@
 use rsat::cdcl;
-use rsat::Var;
+use rsat::common::{Solution, Var};
 use std::fs::File;
 use std::io;
 use std::io::Write;
@@ -43,24 +43,31 @@ fn parse_from_file(filename: &str) -> (usize, Vec<Vec<i32>>) {
 
 // Function to write drat clauses to file
 fn write_drat_clauses(drat: Option<File>, solver: rsat::cdcl::Solver) {
+    use cdcl::DratClause;
     if let Some(mut drat_file) = drat {
-        for (lits, is_delete) in solver.drat_clauses() {
-            if is_delete {
-                write!(drat_file, "d ").unwrap();
+        if let Some(drat_clauses) = solver.drat_clauses() {
+            for drat_clause in drat_clauses {
+                let (is_delete, lits) = match drat_clause {
+                    DratClause::Add(lits) => (false, lits),
+                    DratClause::Delete(lits) => (true, lits),
+                };
+                if is_delete {
+                    write!(drat_file, "d ").unwrap();
+                }
+                for lit in lits.iter() {
+                    write!(
+                        drat_file,
+                        "{} ",
+                        if lit.sign() {
+                            -(lit.var().index() as i32 + 1)
+                        } else {
+                            lit.var().index() as i32 + 1
+                        }
+                    )
+                    .unwrap();
+                }
+                writeln!(drat_file, "0").unwrap();
             }
-            for lit in lits.iter() {
-                write!(
-                    drat_file,
-                    "{} ",
-                    if lit.sign() {
-                        -(lit.var().index() as i32 + 1)
-                    } else {
-                        lit.var().index() as i32 + 1
-                    }
-                )
-                .unwrap();
-            }
-            writeln!(drat_file, "0").unwrap();
         }
     }
 }
@@ -69,14 +76,13 @@ fn main() {
     let opt = Opt::from_args();
     let (n_vars, clauses) = parse_from_file(opt.file.to_str().unwrap());
 
-    use rsat::Solution::*;
     let solution = match opt.alg {
         1 => {
             if opt.parallel {
                 panic!("Parallelism is not implemented for CDCL solver yet.");
             }
 
-            use cdcl::*;
+            use cdcl::{Solver, SolverOptions};
 
             let mut options = SolverOptions::default();
             // options.branching_heuristic = BranchingHeuristic::Vsids {
@@ -111,7 +117,7 @@ fn main() {
 
             let solution = solver.solve(vec![]);
 
-            if let Unsat = solution {
+            if let Solution::Unsat = solution {
                 write_drat_clauses(drat, solver);
             }
             solution
@@ -128,9 +134,9 @@ fn main() {
         _ => panic!("Invalid algorithm"),
     };
     match solution {
-        Unsat => println!("s UNSATISFIABLE"),
-        Unknown => println!("s UNKNOWN"),
-        Best(solution) => {
+        Solution::Unsat => println!("s UNSATISFIABLE"),
+        Solution::Unknown => println!("s UNKNOWN"),
+        Solution::Best(solution) => {
             println!("s UNKNOWN");
             let solution = solution.iter().map(|&x| if x { 1 } else { -1 });
             print!("v ");
@@ -139,7 +145,7 @@ fn main() {
             }
             println!("0");
         }
-        Sat(solution) => {
+        Solution::Sat(solution) => {
             println!("s SATISFIABLE");
             print!("v ");
             let solution = solution.iter().map(|&x| if x { 1 } else { -1 });

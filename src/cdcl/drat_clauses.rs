@@ -1,8 +1,16 @@
-use crate::Lit;
+use crate::common::Lit;
+
+/// Drat Clause type
+pub enum DratClause {
+    /// Represents Add Drat Clause
+    Add(Vec<Lit>),
+    /// Represents Delete Drat Clause
+    Delete(Vec<Lit>),
+}
 
 /// Storage for drat clauses
 pub(crate) struct DratClauses {
-    pub drat_clauses: Vec<(Vec<Lit>, bool)>,
+    drat_clauses: Vec<DratClause>,
     capture_drat: bool,
 }
 
@@ -16,7 +24,19 @@ impl DratClauses {
 
     pub fn capture(&mut self, lits: &[Lit], is_delete: bool) {
         if self.capture_drat {
-            self.drat_clauses.push((Vec::from(lits), is_delete));
+            self.drat_clauses.push(if is_delete {
+                DratClause::Delete(Vec::from(lits))
+            } else {
+                DratClause::Add(Vec::from(lits))
+            });
+        }
+    }
+
+    pub fn drat_clauses(self) -> Option<Vec<DratClause>> {
+        if self.capture_drat {
+            Some(self.drat_clauses)
+        } else {
+            None
         }
     }
 }
