@@ -7,7 +7,7 @@ description = """
 SAT Solver
 """
 documentation = "https://docs.rs/rsat/"
-homepage = "https://solhop.org/tools/rsat"
+homepage = "https://solhop.org/rsat"
 repository = "https://github.com/solhop/rsat"
 readme = "README.md"
 keywords = ["SAT", "Boolean", "Satisfiability", "Solver", "Math"]
@@ -19,7 +19,7 @@ exclude = ["/.vscode/", "/.github/"]
 maintenance = { status = "actively-developed" }
 
 [dependencies]
-regex = "1.3"
+regex = "1.4"
 rand = "0.7"
 rayon = "1.4"
 structopt = "0.3"
