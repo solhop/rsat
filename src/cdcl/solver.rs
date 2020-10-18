@@ -3,7 +3,7 @@ use super::drat_clauses::{DratClause, DratClauses};
 use super::solver_options::SolverOptions;
 use super::trail::Trail;
 use super::VarManager;
-use crate::common::{Clause, LBool, Lit, Solution, Var, UNDEF_LIT};
+use solhop_types::{Clause, LBool, Lit, Solution, Var, UNDEF_LIT};
 use std::collections::HashSet;
 use std::collections::VecDeque;
 

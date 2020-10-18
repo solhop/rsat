@@ -1,4 +1,4 @@
-use crate::common::Lit;
+use solhop_types::Lit;
 
 /// Drat Clause type
 pub enum DratClause {

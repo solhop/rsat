@@ -19,7 +19,6 @@ exclude = ["/.vscode/", "/.github/"]
 maintenance = { status = "actively-developed" }
 
 [dependencies]
-regex = "1.4"
+solhop-types = "=0.1.0"
 rand = "0.7"
 rayon = "1.4"
-structopt = "0.3"

@@ -1,7 +1,7 @@
-use crate::common::{Clause, LBool, Lit, Solution, Var};
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 use rayon::prelude::*;
+use solhop_types::{Clause, LBool, Lit, Solution};
 use std::fs::File;
 use std::io;
 
@@ -45,26 +45,11 @@ impl Solver {
     where
         F: std::io::BufRead,
     {
-        let parsed = crate::parser::parse_dimacs_from_buf_reader(reader);
-        if let crate::parser::Dimacs::Cnf { n_vars, clauses } = parsed {
+        let parsed = solhop_types::dimacs::parse_dimacs_from_buf_reader(reader);
+        if let solhop_types::dimacs::Dimacs::Cnf { n_vars, clauses } = parsed {
             Solver {
                 num_vars: n_vars,
-                clauses: clauses
-                    .into_iter()
-                    .map(|cl| Clause {
-                        lits: cl
-                            .into_iter()
-                            .map(|l| {
-                                let var = Var::new((l.abs() - 1) as usize);
-                                if l < 0 {
-                                    var.neg_lit()
-                                } else {
-                                    var.pos_lit()
-                                }
-                            })
-                            .collect(),
-                    })
-                    .collect(),
+                clauses: clauses.into_iter().map(|lits| Clause { lits }).collect(),
             }
         } else {
             panic!("Incorrect input format");

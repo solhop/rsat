@@ -1,6 +1,6 @@
 use super::solver_options::ClauseDbOptions;
 use super::{DratClauses, VarManager};
-use crate::common::Clause;
+use solhop_types::Clause;
 use std::collections::HashMap;
 
 #[derive(Clone, Copy, PartialEq, Debug)]

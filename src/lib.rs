@@ -1,10 +1,12 @@
+#![deny(missing_docs)]
+
 //! `rsat` is a SAT Solver.
 //!
 //! ## An example using the CDCL solver
 //!
 //! ```rust
 //! use rsat::cdcl::{Solver, SolverOptions};
-//! use rsat::common::{Var, Solution};
+//! use solhop_types::{Var, Solution};
 //!
 //! let options = SolverOptions::default();
 //! let mut solver = Solver::new(options);
@@ -22,14 +24,6 @@
 //! solver.add_clause(vec![vars[2].neg_lit()]);
 //! assert_eq!(solver.solve(vec![]), Solution::Unsat);
 //! ```
-
-#![deny(missing_docs)]
-
-/// Common utils.
-pub mod common;
-
-/// DIMACS Parser.
-pub mod parser;
 
 /// Stochastic local search solver module.
 pub mod sls;
