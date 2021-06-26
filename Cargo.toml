@@ -7,7 +7,7 @@ description = """
 SAT Solver
 """
 documentation = "https://docs.rs/rsat/"
-homepage = "https://solhop.org/rsat"
+homepage = "https://solhop.netlify.app/rsat"
 repository = "https://github.com/solhop/rsat"
 readme = "README.md"
 keywords = ["SAT", "Boolean", "Satisfiability", "Solver", "Math"]
